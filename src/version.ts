@@ -1,2 +1,1 @@
-export default '__SOLID_VITE_VERSION__';
-
+export default '__START_DEVTOOLS_VERSION__';
