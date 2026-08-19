@@ -18,6 +18,10 @@ import { DevToolbar } from "@solidjs/start-devtools";
 </DevToolbar>;
 ```
 
+For authored server and client entries, render `DevToolbar` around the app in a shared
+document or root component. The package selects an SSR-safe build on the server, so the
+same component provides the development error boundary on both sides.
+
 The package is intended for development and should not be imported into production entries.
 
 For component and reactivity inspection, see [Solid Devtools](https://github.com/thetarnav/solid-devtools).

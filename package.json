@@ -11,6 +11,10 @@
   "exports": {
     ".": {
       "types": "./dist/types/index.d.ts",
+      "worker": "./dist/server.js",
+      "browser": "./dist/index.js",
+      "deno": "./dist/server.js",
+      "node": "./dist/server.js",
       "import": "./dist/index.js"
     }
   },

@@ -1,5 +1,5 @@
 import type { JSX } from '@solidjs/web';
-import { clientOnly, Portal } from '@solidjs/web';
+import { clientOnly, httpStatus, isServer, Portal } from '@solidjs/web';
 import { createEffect, createSignal, Errored, onSettled } from 'solid-js';
 import { Toolbar } from 'terracotta/toolbar';
 import version from '../version.js';
@@ -213,6 +213,7 @@ export function DevToolbar(props: DevToolbarProps) {
       <Errored
         fallback={(error) => {
           const err = error();
+          if (isServer) httpStatus(500);
           queueMicrotask(() => pushError(err));
           return <></>;
         }}

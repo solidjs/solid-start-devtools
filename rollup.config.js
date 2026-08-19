@@ -6,11 +6,12 @@ import cleaner from 'rollup-plugin-cleaner';
 
 const extensions = ['.js', '.ts', '.json', '.tsx', '.jsx'];
 
-function css() {
+function css(server = false) {
   return {
     name: 'devtools-css',
     transform(code, id) {
       if (!id.endsWith('.css')) return null;
+      if (server) return { code: '', map: null };
       return {
         code: `const style = document.createElement('style');\nstyle.textContent = ${JSON.stringify(code)};\ndocument.head.append(style);`,
         map: null,
@@ -49,40 +50,59 @@ function packageVersion() {
   };
 }
 
-export default {
-  input: 'src/index.tsx',
-  output: {
-    format: 'esm',
-    dir: 'dist',
+function external(id) {
+  return (
+    id === 'solid-js' ||
+    id.startsWith('solid-js/') ||
+    id === '@solidjs/web' ||
+    id.startsWith('@solidjs/web/')
+  );
+}
+
+function config({ input, entryFileNames, chunkFileNames, generate, server = false }) {
+  return {
+    input,
+    output: {
+      format: 'esm',
+      dir: 'dist',
+      entryFileNames,
+      chunkFileNames,
+      assetFileNames: 'assets/[name]-[hash][extname]',
+      sourcemap: true,
+    },
+    external,
+    plugins: [
+      ...(server ? [] : [cleaner({ targets: ['./dist/'] })]),
+      css(server),
+      assetUrl(),
+      packageVersion(),
+      babel({
+        extensions,
+        babelHelpers: 'bundled',
+        presets: [
+          ['@babel/preset-env', { targets: { esmodules: true } }],
+          '@babel/preset-typescript',
+          ['babel-preset-solid', { moduleName: '@solidjs/web', generate }],
+        ],
+      }),
+      nodeResolve({ extensions, browser: !server }),
+      cjs({ extensions }),
+    ],
+  };
+}
+
+export default [
+  config({
+    input: 'src/index.tsx',
     entryFileNames: 'index.js',
     chunkFileNames: 'chunks/[name]-[hash].js',
-    assetFileNames: 'assets/[name]-[hash][extname]',
-    sourcemap: true,
-  },
-  external(id) {
-    return (
-      id === 'solid-js' ||
-      id.startsWith('solid-js/') ||
-      id === '@solidjs/web' ||
-      id.startsWith('@solidjs/web/')
-    );
-  },
-  plugins: [
-    cleaner({ targets: ['./dist/'] }),
-    css(),
-    assetUrl(),
-    packageVersion(),
-    babel({
-      extensions,
-      babelHelpers: 'bundled',
-      presets: [
-        ['@babel/preset-env', { targets: { esmodules: true } }],
-        '@babel/preset-typescript',
-        ['babel-preset-solid', { moduleName: '@solidjs/web', generate: 'dom' }],
-      ],
-    }),
-    nodeResolve({ extensions, browser: true }),
-    cjs({ extensions }),
-  ],
-};
-
+    generate: 'dom',
+  }),
+  config({
+    input: 'src/server.tsx',
+    entryFileNames: 'server.js',
+    chunkFileNames: 'server-chunks/[name]-[hash].js',
+    generate: 'ssr',
+    server: true,
+  }),
+];
