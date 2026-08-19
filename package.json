@@ -22,7 +22,7 @@
     }
   },
   "scripts": {
-    "build": "rollup -c && tsc --emitDeclarationOnly",
+    "build": "rolldown -c && tsc --emitDeclarationOnly",
     "check": "package-check",
     "test": "vitest run",
     "release": "pnpm build && changeset publish"
@@ -54,9 +54,7 @@
     "@babel/preset-env": "^7.29.0",
     "@babel/preset-typescript": "^7.28.0",
     "@changesets/cli": "^2.30.0",
-    "@rollup/plugin-babel": "^6.1.0",
-    "@rollup/plugin-commonjs": "^25.0.8",
-    "@rollup/plugin-node-resolve": "^15.3.1",
+    "@rolldown/plugin-babel": "^0.2.3",
     "@skypack/package-check": "^0.2.2",
     "@solidjs/web": "^2.0.0-rc.0",
     "@types/node": "^24.0.0",
@@ -64,20 +62,14 @@
     "error-stack-parser": "^2.1.4",
     "html-to-image": "^1.11.13",
     "prettier": "^3.1.0",
-    "rollup": "^4.5.0",
-    "rollup-plugin-cleaner": "^1.0.0",
+    "rolldown": "^1.2.4",
     "seroval": "^1.6.0",
     "shiki": "^4.3.1",
     "solid-js": "^2.0.0-rc.0",
     "source-map-js": "^1.2.1",
     "terracotta": "2.0.0-next.6",
-    "typescript": "^5.9.0",
-    "vitest": "^3.2.0"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   },
-  "packageManager": "pnpm@10.15.1",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
-  }
+  "packageManager": "pnpm@11.22.0"
 }
