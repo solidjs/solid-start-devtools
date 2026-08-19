@@ -22,12 +22,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/solidjs/start-devtools.git"
+    "url": "git+https://github.com/solidjs/solid-start-devtools.git"
   },
   "bugs": {
-    "url": "https://github.com/solidjs/start-devtools/issues"
+    "url": "https://github.com/solidjs/solid-start-devtools/issues"
   },
-  "homepage": "https://github.com/solidjs/start-devtools#readme",
+  "homepage": "https://github.com/solidjs/solid-start-devtools#readme",
   "keywords": [
     "solid",
     "solidjs",

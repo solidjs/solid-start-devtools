@@ -183,7 +183,7 @@ interface ErrorViewerProps {
   resetError: () => void;
 }
 
-const ISSUE_THREAD = 'https://github.com/solidjs/start-devtools/issues/new';
+const ISSUE_THREAD = 'https://github.com/solidjs/solid-start-devtools/issues/new';
 const DISCORD_INVITE = 'https://discord.com/invite/solidjs';
 
 export default function ErrorViewer(props: ErrorViewerProps): JSX.Element {
