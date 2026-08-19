@@ -4,5 +4,7 @@
   "initialVersions": {
     "@solidjs/start-devtools": "0.0.0"
   },
-  "changesets": []
+  "changesets": [
+    "initial-release"
+  ]
 }
