@@ -1,6 +1,7 @@
 import type { SerovalNode } from 'seroval';
 import { createEffect, createSignal, For, omit, Show } from 'solid-js';
 import type { JSX } from '@solidjs/web';
+import { ChunkReader } from '@solidjs/web/server-functions/client';
 
 import { Badge } from '../../ui/Badge.js';
 import { Cascade, CascadeOption } from '../../ui/Cascade.js';
@@ -8,7 +9,6 @@ import { Section } from '../../ui/Section.js';
 import { HexViewer } from './HexViewer.js';
 import { PropertySeparator, SerovalValue } from './SerovalValue.js';
 
-import { SerovalChunkReader } from './seroval-chunk-reader.js';
 import './SerovalViewer.css';
 
 function LinkIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
@@ -918,7 +918,7 @@ export function SerovalViewer(props: SerovalViewerProps): JSX.Element {
         if (!stream.body) {
           throw new Error('missing body');
         }
-        const reader = new SerovalChunkReader(stream.body);
+        const reader = new ChunkReader(stream.body);
         const result = await reader.next();
         if (!result.done) {
           function traverseNode(node: SerovalNode): void {
@@ -977,7 +977,13 @@ export function SerovalViewer(props: SerovalViewerProps): JSX.Element {
             return result;
           }
 
-          void reader.drain(interpretChunk);
+          void (async () => {
+            while (true) {
+              const chunk = await reader.next();
+              if (chunk.done) return;
+              if (chunk.value !== undefined) interpretChunk(chunk.value);
+            }
+          })();
           const root = interpretChunk(result.value);
           setSelected(root);
         }
@@ -996,4 +1002,3 @@ export function SerovalViewer(props: SerovalViewerProps): JSX.Element {
     </div>
   );
 }
-
