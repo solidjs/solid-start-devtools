@@ -105,4 +105,11 @@ export default [
     generate: 'ssr',
     server: true,
   }),
+  config({
+    input: 'src/noop.ts',
+    entryFileNames: 'noop.js',
+    chunkFileNames: 'noop-chunks/[name]-[hash].js',
+    generate: 'ssr',
+    server: true,
+  }),
 ];

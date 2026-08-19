@@ -1,11 +1,18 @@
 import { render } from '@solidjs/web';
-import { pushServerFunctionCall } from './dev-toolbar/functions/tracker.js';
-import { DevToolbar } from './dev-toolbar/index.js';
+import * as serverFunctions from '@solidjs/web/server-functions';
+import {
+  pushServerFunctionCall,
+  type ServerFunctionCall,
+} from './dev-toolbar/functions/tracker.js';
+import { DevToolbar, type DevToolbarProps } from './dev-toolbar/index.js';
 
 let dispose: (() => void) | undefined;
 let frame: number | undefined;
 
-export { DevToolbar, pushServerFunctionCall };
+export { DevToolbar, type DevToolbarProps, pushServerFunctionCall, type ServerFunctionCall };
+
+const observe = Reflect.get(serverFunctions, 'observeServerFunctionCalls');
+if (typeof observe === 'function') observe(pushServerFunctionCall);
 
 export function mountDevToolbar(): () => void {
   if (dispose) return dispose;
