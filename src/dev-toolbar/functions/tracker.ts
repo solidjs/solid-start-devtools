@@ -31,4 +31,3 @@ export function pushServerFunctionCall(event: ServerFunctionCall): void {
     listener(event);
   }
 }
-

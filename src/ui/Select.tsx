@@ -6,4 +6,3 @@ export const Select: typeof BaseSelect = (props) => <BaseSelect data-solid-selec
 export const SelectOption: typeof BaseSelectOption = (props) => (
   <BaseSelectOption data-solid-select-option {...props} />
 );
-

@@ -10,7 +10,14 @@ export type TextProps<T extends keyof JSX.IntrinsicElements = 'span'> = Componen
     size?: 'xs' | 'sm' | 'base' | 'lg' | 'xl' | '2xl';
     font?: 'sans' | 'serif' | 'mono';
     weight?:
-      'thin' | 'extralight' | 'light' | 'normal' | 'medium' | 'semibold' | 'bold' | 'extrabold';
+      | 'thin'
+      | 'extralight'
+      | 'light'
+      | 'normal'
+      | 'medium'
+      | 'semibold'
+      | 'bold'
+      | 'extrabold';
     wrap?: 'wrap' | 'nowrap';
   };
 };
@@ -39,4 +46,3 @@ export function Text<T extends keyof JSX.IntrinsicElements = 'span'>(
 
   return <Dynamic component={(props.options?.as || 'span') as T} {...rest} {...customization()} />;
 }
-

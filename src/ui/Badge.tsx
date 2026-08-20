@@ -17,4 +17,3 @@ export function Badge(props: BadgeProps): JSX.Element {
     </Text>
   );
 }
-

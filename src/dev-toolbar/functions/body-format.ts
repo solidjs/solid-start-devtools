@@ -14,4 +14,3 @@ export const enum BodyFormat {
   Uint8Array = '7',
   Json = '8',
 }
-

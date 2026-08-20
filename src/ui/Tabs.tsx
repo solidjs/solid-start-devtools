@@ -17,4 +17,3 @@ export const TabPanel: typeof BaseTabPanel = (props) => (
 export const TabList: typeof BaseTabList = (props) => (
   <BaseTabList data-solid-tab-list {...props} />
 );
-

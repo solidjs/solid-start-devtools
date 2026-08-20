@@ -11,7 +11,7 @@ pnpm add @solidjs/start-devtools@next
 The Vite plugin mounts it automatically. Integrations can use the package directly:
 
 ```tsx
-import { DevToolbar } from "@solidjs/start-devtools";
+import { DevToolbar } from '@solidjs/start-devtools';
 
 <DevToolbar>
   <App />

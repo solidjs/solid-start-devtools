@@ -102,4 +102,3 @@ export function HexViewer(props: HexViewerProps): JSX.Element {
     </Loading>
   );
 }
-

@@ -6,4 +6,3 @@ export const Cascade: typeof BaseSelect = (props) => <BaseSelect data-solid-casc
 export const CascadeOption: typeof BaseSelectOption = (props) => (
   <BaseSelectOption data-solid-cascade-option {...props} />
 );
-

@@ -4,4 +4,3 @@ export default function download(dataurl: string, filename: string) {
   link.download = filename;
   link.click();
 }
-

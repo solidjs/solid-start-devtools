@@ -98,4 +98,3 @@ export function createStackFrame(stackframe: StackFrame, isCompiled: () => boole
 
   return info as Accessor<StackFrameSource>;
 }
-

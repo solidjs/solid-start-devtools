@@ -30,4 +30,3 @@ export default async function getSourceMap(
   const rawSourceMap: RawSourceMap = await response.json();
   return new SourceMapConsumer(rawSourceMap);
 }
-

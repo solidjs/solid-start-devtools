@@ -6,4 +6,3 @@ const Button: typeof BaseButton = (props) => (
 );
 
 export default Button;
-

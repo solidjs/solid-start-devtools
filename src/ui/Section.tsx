@@ -19,4 +19,3 @@ export function Section(props: SectionProps): JSX.Element {
     </div>
   );
 }
-

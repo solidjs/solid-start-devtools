@@ -4,8 +4,5 @@
   "initialVersions": {
     "@solidjs/start-devtools": "0.0.0"
   },
-  "changesets": [
-    "initial-release",
-    "quiet-cats-smile"
-  ]
+  "changesets": ["initial-release", "quiet-cats-smile"]
 }

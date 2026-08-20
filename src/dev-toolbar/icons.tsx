@@ -505,4 +505,3 @@ export function TrashIcon(props: JSX.IntrinsicElements['svg'] & { title: string 
     </svg>
   );
 }
-

@@ -24,6 +24,8 @@
   "scripts": {
     "build": "rolldown -c",
     "check": "publint && attw --pack . --profile esm-only",
+    "format": "oxfmt --write",
+    "format:check": "oxfmt --check",
     "test": "vitest run",
     "release": "pnpm build && changeset publish"
   },
@@ -50,18 +52,14 @@
     "solid-js": "^2.0.0-rc.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.0",
-    "@babel/preset-env": "^7.29.0",
-    "@babel/preset-typescript": "^7.28.0",
     "@arethetypeswrong/cli": "^0.18.5",
     "@changesets/cli": "^2.30.0",
-    "@rolldown/plugin-babel": "^0.2.3",
+    "@dom-expressions/compiler": "^0.50.0-next.43",
     "@solidjs/web": "^2.0.0-rc.0",
     "@types/node": "^24.0.0",
-    "babel-preset-solid": "^2.0.0-rc.0",
     "error-stack-parser": "^2.1.4",
     "html-to-image": "^1.11.13",
-    "prettier": "^3.1.0",
+    "oxfmt": "^0.64.0",
     "publint": "^0.3.23",
     "rolldown": "^1.2.4",
     "rolldown-plugin-dts": "^0.28.2",

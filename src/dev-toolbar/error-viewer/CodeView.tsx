@@ -88,4 +88,3 @@ export function CodeView(props: CodeViewProps): JSX.Element | null {
     />
   );
 }
-

@@ -16,4 +16,3 @@ export function SerovalValue(props: SerovalValueProps) {
 export function PropertySeparator() {
   return <Text options={{ size: 'xs', weight: 'semibold', wrap: 'nowrap' }}>:</Text>;
 }
-

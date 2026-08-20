@@ -75,4 +75,3 @@ export function BlobViewer(props: BlobViewerProps): JSX.Element {
     </Loading>
   );
 }
-

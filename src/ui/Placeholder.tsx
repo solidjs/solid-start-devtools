@@ -8,4 +8,3 @@ export interface PlaceholderProps {
 export default function Placeholder(props: PlaceholderProps): JSX.Element {
   return <div data-solid-placeholder>{props.children}</div>;
 }
-

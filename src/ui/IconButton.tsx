@@ -6,4 +6,3 @@ const IconButton: typeof BaseButton = (props) => (
 );
 
 export default IconButton;
-
