@@ -1,6 +1,7 @@
 import babel from "@rolldown/plugin-babel";
 import { readFileSync } from "node:fs";
 import { defineConfig } from "rolldown";
+import { dts } from "rolldown-plugin-dts";
 
 const extensions = [".js", ".ts", ".json", ".tsx", ".jsx"];
 
@@ -120,4 +121,13 @@ export default defineConfig([
     generate: "ssr",
     server: true,
   }),
+  {
+    input: "src/index.tsx",
+    output: {
+      format: "esm",
+      dir: "dist/types",
+    },
+    external,
+    plugins: [dts({ emitDtsOnly: true })],
+  },
 ]);
