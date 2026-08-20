@@ -208,12 +208,12 @@ function ServerFunctionInstanceDetail(props: ServerFunctionInstanceDetailProps) 
           {props.value.request.meta?.name ?? props.value.request.id}
         </Text>
       </span>
-      <Show when={props.value.response}>
+      <Show when={props.value.response} keyed>
         {(response) => {
-          if (response().source.ok) {
-            return <Badge type="success">{response().source.status}</Badge>;
+          if (response.source.ok) {
+            return <Badge type="success">{response.source.status}</Badge>;
           }
-          return <Badge type="failure">{response().source.status}</Badge>;
+          return <Badge type="failure">{response.source.status}</Badge>;
         }}
       </Show>
     </>

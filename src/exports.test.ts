@@ -22,4 +22,24 @@ describe('package exports', () => {
   it('uses the server build for development in Node', () => {
     expect(resolvePackage('development')).toMatch(/\/dist\/server\.js$/);
   });
+
+  it('passes children through in the default build', async () => {
+    const result = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '--eval',
+          `import { DevToolbar, mountDevToolbar } from '@solidjs/start-devtools';
+           console.log(JSON.stringify({
+             children: DevToolbar({ children: 'content' }),
+             disposed: mountDevToolbar()(),
+           }));`,
+        ],
+        { encoding: 'utf-8' },
+      ),
+    );
+
+    expect(result).toEqual({ children: 'content' });
+  });
 });

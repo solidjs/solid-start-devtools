@@ -27,6 +27,8 @@
     "format": "oxfmt --write",
     "format:check": "oxfmt --check",
     "test": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit -p tsconfig.tests.json",
     "release": "pnpm build && changeset publish"
   },
   "repository": {
@@ -55,6 +57,7 @@
     "@arethetypeswrong/cli": "^0.18.5",
     "@changesets/cli": "^2.30.0",
     "@dom-expressions/compiler": "^0.50.0-next.43",
+    "@playwright/test": "^1.62.1",
     "@solidjs/web": "^2.0.0-rc.0",
     "@types/node": "^24.0.0",
     "error-stack-parser": "^2.1.4",
@@ -69,6 +72,7 @@
     "source-map-js": "^1.2.1",
     "terracotta": "2.0.0-next.6",
     "typescript": "^7.0.2",
+    "vite": "^8.2.1",
     "vitest": "^4.1.11"
   },
   "packageManager": "pnpm@11.22.0"
