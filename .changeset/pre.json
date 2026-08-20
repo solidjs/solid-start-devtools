@@ -5,6 +5,7 @@
     "@solidjs/start-devtools": "0.0.0"
   },
   "changesets": [
+    "fresh-tools-observe",
     "initial-release",
     "modern-toolchain",
     "native-oxc-toolchain",

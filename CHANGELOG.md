@@ -1,5 +1,11 @@
 # @solidjs/start-devtools
 
+## 1.0.0-next.3
+
+### Patch Changes
+
+- 34d3748: Keep server-function inspector entries reactive as responses arrive.
+
 ## 1.0.0-next.2
 
 ### Patch Changes
