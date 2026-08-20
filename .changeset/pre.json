@@ -4,5 +4,11 @@
   "initialVersions": {
     "@solidjs/start-devtools": "0.0.0"
   },
-  "changesets": ["initial-release", "quiet-cats-smile"]
+  "changesets": [
+    "initial-release",
+    "modern-toolchain",
+    "native-oxc-toolchain",
+    "quiet-cats-smile",
+    "safe-production-imports"
+  ]
 }

@@ -1,5 +1,13 @@
 # @solidjs/start-devtools
 
+## 1.0.0-next.2
+
+### Patch Changes
+
+- 7783dd5: Build with Rolldown, update the project toolchain, and strengthen package validation.
+- 550ba8e: Build with the native Solid compiler and migrate formatting to Oxfmt.
+- f7dd9d0: Make direct imports production-safe with a no-op default export and development-only browser and server implementations. Register server-function observers from the browser entry.
+
 ## 1.0.0-next.1
 
 ### Patch Changes
