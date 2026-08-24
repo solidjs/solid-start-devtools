@@ -10,6 +10,7 @@
     "modern-toolchain",
     "native-oxc-toolchain",
     "quiet-cats-smile",
-    "safe-production-imports"
+    "safe-production-imports",
+    "toolbar-redesign"
   ]
 }
