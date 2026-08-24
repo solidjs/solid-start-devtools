@@ -8,12 +8,11 @@ import { Section } from '../../ui/Section.js';
 import { Select, SelectOption } from '../../ui/Select.js';
 import { Tab, TabGroup, TabList, TabPanel } from '../../ui/Tabs.js';
 import { Text } from '../../ui/Text.js';
-import { ArrowLeftIcon, FunctionIcon, TrashIcon } from '../icons.js';
+import { FunctionIcon, TrashIcon } from '../icons.js';
 import { BlobViewer } from './BlobViewer.js';
 import { FormDataViewer } from './FormDataViewer.js';
 import { HeadersViewer } from './HeadersViewer.js';
 import { HexViewer } from './HexViewer.js';
-import { PropertySeparator, SerovalValue } from './SerovalValue.js';
 import { SerovalViewer } from './SerovalViewer.js';
 import './styles.css';
 import { type ServerFunctionRequest, type ServerFunctionResponse } from './tracker.js';
@@ -66,39 +65,46 @@ interface ContentViewerProps {
 }
 
 function ContentViewer(props: ContentViewerProps): JSX.Element {
+  const body = createMemo(() => {
+    const original = props.source.source;
+    if (!original.body) {
+      return undefined;
+    }
+    const source = original.clone();
+    const startType = source.headers.get(BODY_FORMAT_KEY);
+    const contentType = source.headers.get('Content-Type');
+    switch (true) {
+      case startType === BodyFormat.Serialized:
+        return <SerovalViewer stream={source} />;
+      case startType === BodyFormat.Json:
+      case contentType?.startsWith('application/json'):
+        return <JsonViewer source={source.text()} />;
+      case startType === BodyFormat.String:
+        return <HexViewer bytes={source.bytes()} />;
+      case startType === BodyFormat.File:
+        return <BlobViewer source={getFile(source)} />;
+      case startType === BodyFormat.FormData:
+      case contentType?.startsWith('multipart/form-data'):
+        return <FormDataViewer source={source.formData()} />;
+      case startType === BodyFormat.URLSearchParams:
+      case contentType?.startsWith('application/x-www-form-urlencoded'):
+        return <URLSearchParamsViewer source={getURLSearchParams(source)} />;
+      case startType === BodyFormat.Blob:
+        return <BlobViewer source={source.blob()} />;
+      case startType === BodyFormat.ArrayBuffer:
+      case startType === BodyFormat.Uint8Array:
+        return <HexViewer bytes={source.bytes()} />;
+    }
+    return undefined;
+  });
+
   return (
     <>
-      <Section title="Headers">
+      <Show when={body()}>
+        <Section title="Body">{body()}</Section>
+      </Show>
+      <Section collapsible title="Headers">
         <HeadersViewer headers={props.source.source.headers} />
-      </Section>
-      <Section title="Body">
-        {(() => {
-          const source = props.source.source.clone();
-          const startType = source.headers.get(BODY_FORMAT_KEY);
-          const contentType = source.headers.get('Content-Type');
-          switch (true) {
-            case startType === BodyFormat.Serialized:
-              return <SerovalViewer stream={source} />;
-            case startType === BodyFormat.Json:
-            case contentType?.startsWith('application/json'):
-              return <JsonViewer source={source.text()} />;
-            case startType === BodyFormat.String:
-              return <HexViewer bytes={source.bytes()} />;
-            case startType === BodyFormat.File:
-              return <BlobViewer source={getFile(source)} />;
-            case startType === BodyFormat.FormData:
-            case contentType?.startsWith('multipart/form-data'):
-              return <FormDataViewer source={source.formData()} />;
-            case startType === BodyFormat.URLSearchParams:
-            case contentType?.startsWith('application/x-www-form-urlencoded'):
-              return <URLSearchParamsViewer source={getURLSearchParams(source)} />;
-            case startType === BodyFormat.Blob:
-              return <BlobViewer source={source.blob()} />;
-            case startType === BodyFormat.ArrayBuffer:
-            case startType === BodyFormat.Uint8Array:
-              return <HexViewer bytes={source.bytes()} />;
-          }
-        })()}
       </Section>
     </>
   );
@@ -126,18 +132,26 @@ function convertRequestToEntries(request: Request) {
 function RequestViewer(props: RequestViewerProps): JSX.Element {
   return (
     <TabPanel value="request">
-      <Section title="Information">
-        <For each={convertRequestToEntries(props.request.source)}>
-          {([key, value]) => (
-            <div data-solid-property>
-              <Text options={{ size: 'xs', weight: 'semibold', wrap: 'nowrap' }}>{key}</Text>
-              <PropertySeparator />
-              <SerovalValue value={value} />
-            </div>
-          )}
-        </For>
-      </Section>
       <ContentViewer source={props.request} />
+      <Section collapsible defaultOpen={false} title="Information">
+        <div data-solid-properties data-solid-kv-table>
+          <For each={convertRequestToEntries(props.request.source)}>
+            {([key, value]) => (
+              <div data-solid-property data-solid-kv-row>
+                <Text
+                  data-solid-kv-key
+                  options={{ size: 'xs', weight: 'semibold', font: 'mono', wrap: 'nowrap' }}
+                >
+                  {key}
+                </Text>
+                <Text data-solid-kv-value options={{ size: 'xs', font: 'mono', wrap: 'wrap' }}>
+                  {`${value}`}
+                </Text>
+              </div>
+            )}
+          </For>
+        </div>
+      </Section>
     </TabPanel>
   );
 }
@@ -161,28 +175,50 @@ function convertResponseToEntries(response: Response) {
 function ResponseViewer(props: ResponseViewerProps): JSX.Element {
   return (
     <TabPanel value="response">
-      <Show when={props.response}>
+      <Show
+        when={props.response}
+        fallback={
+          <Placeholder>
+            <Text options={{ size: 'xs' }}>Waiting for response.</Text>
+          </Placeholder>
+        }
+      >
         {(instance) => (
           <>
-            <Section title="Information">
-              <For each={convertResponseToEntries(instance().source)}>
-                {([key, value]) => (
-                  <div data-solid-property>
-                    <Text options={{ size: 'xs', weight: 'semibold', wrap: 'nowrap' }}>{key}</Text>
-                    <PropertySeparator />
-                    <SerovalValue value={value} />
-                  </div>
-                )}
-              </For>
-              <div data-solid-property>
-                <Text options={{ size: 'xs', weight: 'semibold', wrap: 'nowrap' }}>Timing</Text>
-                <PropertySeparator />
-                <SerovalValue
-                  value={`${((instance().time - props.request.time) / 1000).toFixed(2)}s`}
-                />
+            <ContentViewer source={instance()} />
+            <Section collapsible defaultOpen={false} title="Information">
+              <div data-solid-properties data-solid-kv-table>
+                <For each={convertResponseToEntries(instance().source)}>
+                  {([key, value]) => (
+                    <div data-solid-property data-solid-kv-row>
+                      <Text
+                        data-solid-kv-key
+                        options={{ size: 'xs', weight: 'semibold', font: 'mono', wrap: 'nowrap' }}
+                      >
+                        {key}
+                      </Text>
+                      <Text
+                        data-solid-kv-value
+                        options={{ size: 'xs', font: 'mono', wrap: 'wrap' }}
+                      >
+                        {`${value}`}
+                      </Text>
+                    </div>
+                  )}
+                </For>
+                <div data-solid-property data-solid-kv-row>
+                  <Text
+                    data-solid-kv-key
+                    options={{ size: 'xs', weight: 'semibold', font: 'mono', wrap: 'nowrap' }}
+                  >
+                    Timing
+                  </Text>
+                  <Text data-solid-kv-value options={{ size: 'xs', font: 'mono', wrap: 'wrap' }}>
+                    {`${((instance().time - props.request.time) / 1000).toFixed(2)}s`}
+                  </Text>
+                </div>
               </div>
             </Section>
-            <ContentViewer source={instance()} />
           </>
         )}
       </Show>
@@ -223,7 +259,6 @@ function ServerFunctionInstanceDetail(props: ServerFunctionInstanceDetailProps) 
 interface ServerFunctionInstanceViewerProps {
   instance: ServerFunctionInstance;
   onDelete: () => void;
-  onReturn: () => void;
 }
 
 function ServerFunctionInstanceViewer(props: ServerFunctionInstanceViewerProps): JSX.Element {
@@ -232,14 +267,20 @@ function ServerFunctionInstanceViewer(props: ServerFunctionInstanceViewerProps):
     <div data-solid-function-instance-viewer>
       <div data-solid-function-instance-viewer-nav>
         <div data-solid-function-instance-viewer-nav-left>
-          <IconButton onClick={props.onReturn}>
-            <ArrowLeftIcon title="Go Back" />
-          </IconButton>
           <div>
             <ServerFunctionInstanceDetail value={props.instance} />
           </div>
         </div>
         <div>
+          <Show when={props.instance.response}>
+            {(response) => (
+              <span data-solid-function-instance-timing>
+                <Text options={{ size: 'xs', weight: 'semibold', font: 'mono', wrap: 'nowrap' }}>
+                  {`${((response().time - props.instance.request.time) / 1000).toFixed(2)}s`}
+                </Text>
+              </span>
+            )}
+          </Show>
           <IconButton onClick={props.onDelete}>
             <TrashIcon title="Delete instance" />
           </IconButton>
@@ -282,24 +323,8 @@ export function ServerFunctionViewer(props: ServerFunctionViewerProps): JSX.Elem
     <Show when={props.show}>
       <div data-solid-dev-toolbar-panel>
         <div data-solid-functions-viewer>
-          <Show when={currentInstance()}>
-            {(value) => (
-              <Show when={props.instances[value()]}>
-                {(instance) => (
-                  <ServerFunctionInstanceViewer
-                    instance={instance()}
-                    onReturn={() => {
-                      setCurrentInstance(undefined);
-                    }}
-                    onDelete={() => {
-                      props.onDeleteInstance(value());
-                    }}
-                  />
-                )}
-              </Show>
-            )}
-          </Show>
-          <Show when={!currentInstance()}>
+          {/* list of calls */}
+          <div data-solid-functions-sidebar>
             <div data-solid-functions-nav>
               <FunctionIcon title="Server functions" />
               <Text options={{ size: 'sm' }}>Server functions</Text>
@@ -324,7 +349,32 @@ export function ServerFunctionViewer(props: ServerFunctionViewerProps): JSX.Elem
                 </Select>
               </Show>
             </div>
-          </Show>
+          </div>
+          {/* request/response viewer */}
+          <div data-solid-functions-detail>
+            <Show
+              when={currentInstance()}
+              fallback={
+                <Placeholder>
+                  <Text options={{ size: 'xs' }}>Select a server function call.</Text>
+                </Placeholder>
+              }
+            >
+              {(value) => (
+                <Show when={props.instances[value()]}>
+                  {(instance) => (
+                    <ServerFunctionInstanceViewer
+                      instance={instance()}
+                      onDelete={() => {
+                        setCurrentInstance(undefined);
+                        props.onDeleteInstance(value());
+                      }}
+                    />
+                  )}
+                </Show>
+              )}
+            </Show>
+          </div>
         </div>
       </div>
     </Show>

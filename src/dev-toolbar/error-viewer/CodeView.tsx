@@ -29,7 +29,7 @@ export interface CodeViewProps {
   line: number;
 }
 
-const RANGE = 8;
+const RANGE = 15;
 
 export function CodeView(props: CodeViewProps): JSX.Element | null {
   const lines = () =>
@@ -50,9 +50,16 @@ export function CodeView(props: CodeViewProps): JSX.Element | null {
       .join('\n');
     const highlighter = await loadHighlighter();
     const fileExtension = props.fileName.split(/[#?]/)[0]!.split('.').pop()?.trim();
-    let lang = fileExtension ?? 'text';
-    if (fileExtension === 'mjs' || fileExtension === 'cjs') {
-      lang = 'js';
+    // Only these grammars are loaded — anything else would make shiki
+    // throw. Fall back to plain JS highlighting for unknown sources.
+    let lang: 'js' | 'jsx' | 'ts' | 'tsx' = 'js';
+    if (
+      fileExtension === 'jsx' ||
+      fileExtension === 'ts' ||
+      fileExtension === 'tsx' ||
+      fileExtension === 'js'
+    ) {
+      lang = fileExtension;
     }
     return highlighter.codeToHtml(value, {
       theme: 'dark-plus',

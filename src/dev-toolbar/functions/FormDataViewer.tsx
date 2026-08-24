@@ -1,8 +1,8 @@
 import { createMemo, For, Loading, Show } from 'solid-js';
 import type { JSX } from '@solidjs/web';
 import { Section } from '../../ui/Section.js';
+import { Text } from '../../ui/Text.js';
 import { BlobViewer } from './BlobViewer.js';
-import { PropertySeparator, SerovalValue } from './SerovalValue.js';
 
 interface FormDataViewerInnerProps {
   source: FormData;
@@ -11,14 +11,20 @@ interface FormDataViewerInnerProps {
 function FormDataViewerInner(props: FormDataViewerInnerProps): JSX.Element {
   return (
     <Section title="FormData" options={{ size: 'sm' }}>
-      <div data-solid-form-data-viewer data-solid-properties>
+      <div data-solid-form-data-viewer data-solid-kv-table>
         <For each={Array.from(props.source.entries())}>
           {([key, value]) => (
-            <div data-solid-property>
-              <SerovalValue value={`"${key}"`} />
-              <PropertySeparator />
+            <div data-solid-property data-solid-kv-row>
+              <Text
+                data-solid-kv-key
+                options={{ size: 'xs', weight: 'semibold', font: 'mono', wrap: 'nowrap' }}
+              >
+                {key}
+              </Text>
               {typeof value === 'string' ? (
-                <SerovalValue value={`"${JSON.stringify(value)}"`} />
+                <Text data-solid-kv-value options={{ size: 'xs', font: 'mono', wrap: 'wrap' }}>
+                  {JSON.stringify(value)}
+                </Text>
               ) : (
                 <BlobViewer source={value} />
               )}

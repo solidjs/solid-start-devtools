@@ -37,6 +37,10 @@ test('captures client errors', async ({ page }) => {
   await expect(page.locator('[data-solid-error-viewer-error-info-message]')).toHaveText(
     'client boom',
   );
+
+  // Frames come from the parsed stack, so an empty list means the parser broke.
+  const frames = page.locator('[data-solid-error-viewer-stack-frame]');
+  await expect(frames.first()).toContainText('app.tsx');
 });
 
 test('shows server-function calls', async ({ page }) => {
@@ -46,15 +50,31 @@ test('shows server-function calls', async ({ page }) => {
   });
 
   await page.goto('/');
-  await page.locator('#emit-server-function-request').click();
-  await page.getByRole('button', { name: 'View Server Functions' }).click();
-
+  const toggle = page.getByRole('button', { name: 'View Server Functions' });
   const instances = page.locator('[data-solid-functions-instances]');
+
+  // The panel overlays the page, so the fixture buttons are only clickable
+  // while it is closed.
+  await page.locator('#emit-server-function-request').click();
+  await toggle.click();
   await expect(instances).toContainText('loadUser');
+
+  await toggle.click();
   await page.locator('#emit-server-function-response').click();
+  await toggle.click();
   await expect(instances).toContainText('201');
+
+  await toggle.click();
   await page.locator('#emit-server-function-response').click();
+  await toggle.click();
   await expect(instances).toContainText('500');
+
+  // The detail pane starts empty and fills in once a call is selected.
+  const detail = page.locator('[data-solid-functions-detail]');
+  await expect(detail).toContainText('Select a server function call.');
+  await page.locator('[data-solid-functions-instances] [data-solid-select-option]').first().click();
+  await expect(detail.locator('[data-solid-function-instance-viewer]')).toBeVisible();
+
   expect(warnings).not.toContainEqual(expect.stringContaining('STRICT_READ_UNTRACKED'));
 });
 

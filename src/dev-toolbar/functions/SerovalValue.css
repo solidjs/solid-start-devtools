@@ -3,3 +3,24 @@
   gap: 0.25rem;
   align-items: center;
 }
+
+[data-solid-seroval-value='key'] {
+  color: oklch(0.78 0.1 305);
+}
+
+[data-solid-seroval-value='string'] {
+  color: oklch(0.78 0.11 150);
+}
+
+[data-solid-seroval-value='number'] {
+  color: oklch(0.8 0.11 80);
+}
+
+[data-solid-seroval-value='keyword'] {
+  color: oklch(0.74 0.1 250);
+  font-style: italic;
+}
+
+[data-solid-seroval-separator] {
+  color: var(--start-dt-text-muted);
+}
