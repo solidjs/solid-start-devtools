@@ -57,8 +57,8 @@ importers:
         specifier: ^2.0.0-rc.0
         version: 2.0.0-rc.0
       terracotta:
-        specifier: 2.0.0-next.6
-        version: 2.0.0-next.6(@solidjs/web@2.0.0-rc.0(solid-js@2.0.0-rc.0))(solid-js@2.0.0-rc.0)
+        specifier: 2.0.0-next.9
+        version: 2.0.0-next.9(@solidjs/web@2.0.0-rc.0(solid-js@2.0.0-rc.0))(solid-js@2.0.0-rc.0)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -1518,12 +1518,11 @@ packages:
   solid-js@2.0.0-rc.0:
     resolution: {integrity: sha512-3enTJ71VL69nM5p/it2InVBDBt316Cqfij+F0S7VuHZLITc8YV7Rvavjoy52nAKKxYWXM+BcXh2K7KcLTf1zdQ==}
 
-  solid-use@1.0.0-next.2:
-    resolution: {integrity: sha512-B5Li4cnaO/4XHCVkqjZX/JjFWq0h1ECmGHEUFKTQG1O7p4lLPB5533fYPD6kD8yhkeegE31yDDGZL4B7xpmjVA==}
+  solid-use@1.0.0-next.3:
+    resolution: {integrity: sha512-bEUzCWEKEYIYr807QNUQfewX3MlaIYExZFKuM3S9kK3pc4tlnpc0YPKnpQp28Inmtd3DzLkmK9Zq1UC1xVM7Gw==}
     engines: {node: '>=20'}
     peerDependencies:
-      '@solidjs/web': ^2.0.0-beta.3
-      solid-js: ^2.0.0-beta.3
+      solid-js: ^2.0.0-rc.5
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -1571,12 +1570,12 @@ packages:
     resolution: {integrity: sha512-wK0Ri4fOGjv/XPy8SBHZChl8CM7uMc5VML7SqiQ0zG7+J5Vr+RMQDoHa2CNT6KHUnTGIXH34UDMkPzAUyapBZg==}
     engines: {node: '>=8'}
 
-  terracotta@2.0.0-next.6:
-    resolution: {integrity: sha512-eaCR2stCu6/zJzvCjtCy+l83jfEUxqsdKIZ88DuGX8zkAmT8jnEK0LQwtpc6PudUTCP0hbhyrhAJMKsRi0zn1A==}
+  terracotta@2.0.0-next.9:
+    resolution: {integrity: sha512-kg5T5EiYfxsFumnGSQ6NB3g8UdvbNULcbbIR2KRCI3W5AJ42WqtgJqngklOX28e+LsXs62ibd3HnfGa7F7NXww==}
     engines: {node: '>=20'}
     peerDependencies:
-      '@solidjs/web': ^2.0.0-beta.15
-      solid-js: ^2.0.0-beta.15
+      '@solidjs/web': ^2.0.0-rc.0
+      solid-js: ^2.0.0-rc.0
 
   thenify-all@1.6.0:
     resolution: {integrity: sha512-RNxQH/qI8/t3thXJDwcstUO4zeqo64+Uy/+sNVRBx4Xn2OX+OZ9oP+iJnNFqplFra2ZUVeKCSa2oVWi3T4uVmA==}
@@ -3052,9 +3051,8 @@ snapshots:
       seroval: 1.5.6
       seroval-plugins: 1.5.6(seroval@1.5.6)
 
-  solid-use@1.0.0-next.2(@solidjs/web@2.0.0-rc.0(solid-js@2.0.0-rc.0))(solid-js@2.0.0-rc.0):
+  solid-use@1.0.0-next.3(solid-js@2.0.0-rc.0):
     dependencies:
-      '@solidjs/web': 2.0.0-rc.0(solid-js@2.0.0-rc.0)
       solid-js: 2.0.0-rc.0
 
   source-map-js@1.2.1: {}
@@ -3100,11 +3098,11 @@ snapshots:
 
   term-size@2.2.1: {}
 
-  terracotta@2.0.0-next.6(@solidjs/web@2.0.0-rc.0(solid-js@2.0.0-rc.0))(solid-js@2.0.0-rc.0):
+  terracotta@2.0.0-next.9(@solidjs/web@2.0.0-rc.0(solid-js@2.0.0-rc.0))(solid-js@2.0.0-rc.0):
     dependencies:
       '@solidjs/web': 2.0.0-rc.0(solid-js@2.0.0-rc.0)
       solid-js: 2.0.0-rc.0
-      solid-use: 1.0.0-next.2(@solidjs/web@2.0.0-rc.0(solid-js@2.0.0-rc.0))(solid-js@2.0.0-rc.0)
+      solid-use: 1.0.0-next.3(solid-js@2.0.0-rc.0)
 
   thenify-all@1.6.0:
     dependencies:
