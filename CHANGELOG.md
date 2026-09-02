@@ -1,5 +1,11 @@
 # @solidjs/start-devtools
 
+## 1.0.0-next.5
+
+### Patch Changes
+
+- cb0e333: Update terracotta to `2.0.0-next.9`.
+
 ## 1.0.0-next.4
 
 ### Patch Changes
