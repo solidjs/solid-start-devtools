@@ -85,6 +85,12 @@ describe('ownerName', () => {
     expect(ownerName(owner({ component: '' }), 'component')).toBe('<Anonymous>');
   });
 
+  it('drops the hot reload tag from a component name', () => {
+    expect(ownerName(owner({ component: '[solid-refresh]Counter' }), 'component')).toBe(
+      '<Counter>',
+    );
+  });
+
   it('falls back to the kind when an owner has no name', () => {
     expect(ownerName(owner({ name: 'count' }), 'memo')).toBe('count');
     expect(ownerName(owner(), 'scope')).toBe('scope');

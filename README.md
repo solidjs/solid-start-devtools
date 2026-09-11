@@ -29,6 +29,14 @@ does not include the toolbar.
 
 The same import is safe in development and production entries.
 
+## Demo
+
+`examples/explorer` is a file explorer whose component tree grows as you open folders.
+
+```sh
+pnpm demo
+```
+
 ## Ownership tree
 
 The ownership panel shows the app as a tree of owners.

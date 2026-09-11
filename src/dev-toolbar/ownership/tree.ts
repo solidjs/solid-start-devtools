@@ -98,9 +98,15 @@ export function ownerKind(owner: RawNode): OwnerKind {
   return 'scope';
 }
 
+/** The hot reload transform wraps components, and its wrapper carries the tag. */
+const REFRESH_PREFIX = '[solid-refresh]';
+
 export function ownerName(owner: RawNode, kind: OwnerKind): string {
   if (kind === 'component') {
-    const name = owner._component?.name;
+    let name = owner._component?.name;
+    if (typeof name === 'string' && name.startsWith(REFRESH_PREFIX)) {
+      name = name.slice(REFRESH_PREFIX.length);
+    }
     return `<${typeof name === 'string' && name.length > 0 ? name : 'Anonymous'}>`;
   }
   const name = owner._name;
