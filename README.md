@@ -29,6 +29,14 @@ does not include the toolbar.
 
 The same import is safe in development and production entries.
 
+## Demo
+
+`examples/demo` is a small orders dashboard that exercises every panel.
+
+```sh
+pnpm demo
+```
+
 ## Reactivity graph
 
 The graph panel maps the running reactive graph. Signals, memos and effects are nodes,
