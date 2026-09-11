@@ -505,3 +505,93 @@ export function TrashIcon(props: JSX.IntrinsicElements['svg'] & { title: string 
     </svg>
   );
 }
+
+export function TreeIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      {...props}
+    >
+      <title>{props.title}</title>
+      <g stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6">
+        <rect x="8.5" y="3" width="7" height="4.6" rx="1.2" />
+        <rect x="3" y="16.4" width="7" height="4.6" rx="1.2" />
+        <rect x="14" y="16.4" width="7" height="4.6" rx="1.2" />
+        <path d="M12 7.6v4.2M6.5 16.4v-2.5a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v2.5" />
+      </g>
+    </svg>
+  );
+}
+
+export function PauseIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="currentColor"
+      viewBox="0 0 24 24"
+      stroke="none"
+      {...props}
+    >
+      <title>{props.title}</title>
+      <path d="M8 5h3v14H8zm5 0h3v14h-3z" />
+    </svg>
+  );
+}
+
+export function PlayIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="currentColor"
+      viewBox="0 0 24 24"
+      stroke="none"
+      {...props}
+    >
+      <title>{props.title}</title>
+      <path d="M8 5.14v13.72L19 12z" />
+    </svg>
+  );
+}
+
+export function ExpandIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      {...props}
+    >
+      <title>{props.title}</title>
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.8"
+        d="m8 9 4 4 4-4M8 15l4 4 4-4M4 5h16"
+      />
+    </svg>
+  );
+}
+
+export function CollapseIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      {...props}
+    >
+      <title>{props.title}</title>
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.8"
+        d="m8 13 4-4 4 4M8 19l4-4 4 4M4 5h16"
+      />
+    </svg>
+  );
+}

@@ -2,7 +2,11 @@
 
 Development error and server-function tooling for Solid Start mode.
 
-`@solidjs/start-devtools` provides the toolbar used by the Solid Vite plugin in development. It includes runtime error inspection, source-mapped stack frames, and server-function request and response inspection.
+`@solidjs/start-devtools` provides the toolbar used by the Solid Vite plugin in development.
+
+- Runtime error inspection with source-mapped stack frames.
+- Server-function request and response inspection.
+- An ownership tree of the components and scopes the app created.
 
 ```sh
 pnpm add @solidjs/start-devtools@next
@@ -25,4 +29,19 @@ does not include the toolbar.
 
 The same import is safe in development and production entries.
 
-For component and reactivity inspection, see [Solid Devtools](https://github.com/thetarnav/solid-devtools).
+## Ownership tree
+
+The ownership panel shows the app as a tree of owners.
+
+Component mode lists components only. The scopes between them are folded into the component
+above, so a component shows every signal, memo and effect created inside it. Owner mode
+shows every owner instead, including roots, memos and effects.
+
+Selecting a row lists its prop names, the signals it holds with their values, the scopes
+folded into it and its children. Prop values are getters, so the panel lists their names
+and never reads them.
+
+The panel reads the tree through the development hooks in `solid-js`, so it is empty in a
+production build of the runtime. It only watches while it is open.
+
+For reactivity inspection, see [Solid Devtools](https://github.com/thetarnav/solid-devtools).

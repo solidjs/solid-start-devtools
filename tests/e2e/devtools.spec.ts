@@ -78,6 +78,36 @@ test('shows server-function calls', async ({ page }) => {
   expect(warnings).not.toContainEqual(expect.stringContaining('STRICT_READ_UNTRACKED'));
 });
 
+test('maps the ownership tree', async ({ page }) => {
+  await page.goto('/');
+  const toggle = page.getByRole('button', { name: 'View Ownership Tree' });
+  const rows = page.locator('[data-solid-ownership-name]');
+
+  await toggle.click();
+  await expect(rows).toHaveText(['<App>', '<Greeting>', '<Counter>', '<Show>']);
+
+  // A component owns the signals and scopes created inside it.
+  await page.locator('[data-solid-ownership-label]').filter({ hasText: '<Counter>' }).click();
+  const detail = page.locator('[data-solid-ownership-detail]');
+  await expect(detail).toContainText('Signals (1)');
+  await expect(detail).toContainText('count');
+  await expect(detail).toContainText('doubled');
+
+  // Props are listed by name, never read.
+  await page.locator('[data-solid-ownership-label]').filter({ hasText: '<Greeting>' }).click();
+  await expect(detail).toContainText('Props (1)');
+  await expect(detail).toContainText('name');
+
+  // Owner mode adds the scopes that component mode folds away.
+  await page.getByRole('button', { name: 'Owners', exact: true }).click();
+  await expect(rows.filter({ hasText: 'doubled' })).toHaveCount(1);
+
+  // Search keeps the ancestors of a match so the row stays reachable.
+  await page.getByRole('button', { name: 'Components', exact: true }).click();
+  await page.locator('[data-solid-ownership-search]').fill('doubled');
+  await expect(rows).toHaveText(['<App>', '<Counter>']);
+});
+
 test('mounts once and disposes', async ({ page }) => {
   await page.goto('/?mount');
 

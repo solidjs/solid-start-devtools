@@ -1,22 +1,36 @@
 import type { JSX } from '@solidjs/web';
 import { clientOnly, httpStatus, isServer, Portal } from '@solidjs/web';
-import { createEffect, createSignal, Errored, onSettled } from 'solid-js';
+import { createEffect, createSignal, Errored, getOwner, onSettled } from 'solid-js';
 import { Toolbar } from 'terracotta/toolbar';
 import version from '../version.js';
 import IconButton from '../ui/IconButton.js';
 import { Text } from '../ui/Text.js';
 import { type ServerFunctionInstance, ServerFunctionViewer } from './functions/index.js';
 import { captureServerFunctionCall } from './functions/tracker.js';
-import { ErrorIcon, FunctionIcon, SolidIcon } from './icons.js';
+import { ErrorIcon, FunctionIcon, SolidIcon, TreeIcon } from './icons.js';
+import { excludeOwner, includeOwner } from './ownership/registry.js';
 import './index.css';
 
 const ErrorViewer = clientOnly(() => import('./error-viewer/index.js'), { lazy: true });
+const OwnershipViewer = clientOnly(() => import('./ownership/index.js'), { lazy: true });
 
 export interface DevToolbarProps {
   children?: JSX.Element;
 }
 
+/**
+ * Owns the app the toolbar wraps. Everything created here counts as app code,
+ * even though the toolbar's own scope encloses it.
+ */
+function AppScope(props: { children?: JSX.Element }): JSX.Element {
+  includeOwner(getOwner());
+  return <>{props.children}</>;
+}
+
 export function DevToolbar(props: DevToolbarProps) {
+  // Everything the toolbar creates stays out of the tree it renders.
+  excludeOwner(getOwner());
+
   const [ref, setRef] = createSignal<HTMLElement>();
 
   createEffect(
@@ -123,9 +137,9 @@ export function DevToolbar(props: DevToolbarProps) {
     },
   );
 
-  const [content, setContent] = createSignal<'fn' | 'err' | undefined>(undefined);
+  const [content, setContent] = createSignal<'fn' | 'err' | 'own' | undefined>(undefined);
 
-  function toggleContent(value: 'fn' | 'err') {
+  function toggleContent(value: 'fn' | 'err' | 'own') {
     if (content() === value) {
       setContent(undefined);
     } else {
@@ -197,6 +211,9 @@ export function DevToolbar(props: DevToolbarProps) {
               <IconButton onClick={() => toggleContent('fn')}>
                 <FunctionIcon title="View Server Functions" />
               </IconButton>
+              <IconButton onClick={() => toggleContent('own')}>
+                <TreeIcon title="View Ownership Tree" />
+              </IconButton>
             </div>
             <div>
               <SolidIcon title="Start Devtools Version" />
@@ -208,6 +225,7 @@ export function DevToolbar(props: DevToolbarProps) {
             </div>
           </Toolbar>
           <ErrorViewer show={content() === 'err'} errors={errors()} resetError={resetError} />
+          <OwnershipViewer show={content() === 'own'} />
           <ServerFunctionViewer
             show={content() === 'fn'}
             instances={instances()}
@@ -229,7 +247,7 @@ export function DevToolbar(props: DevToolbarProps) {
           return <></>;
         }}
       >
-        {props.children}
+        <AppScope>{props.children}</AppScope>
       </Errored>
     </>
   );

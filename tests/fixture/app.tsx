@@ -1,6 +1,6 @@
 import { render } from '@solidjs/web';
 import { DevToolbar, mountDevToolbar, pushServerFunctionCall } from '@solidjs/start-devtools';
-import { createSignal, Show } from 'solid-js';
+import { createMemo, createSignal, Show } from 'solid-js';
 
 function Broken(): never {
   throw new Error('client boom');
@@ -32,12 +32,29 @@ function emitServerFunctionResponse() {
   responseStatus = 500;
 }
 
+function Greeting(props: { name: string }) {
+  return <p id="fixture-greeting">{`hello ${props.name}`}</p>;
+}
+
+function Counter() {
+  const [count, setCount] = createSignal(0, { name: 'count' });
+  const doubled = createMemo(() => count() * 2, { name: 'doubled' });
+
+  return (
+    <button id="increment-count" onClick={() => setCount((value) => value + 1)}>
+      {`count ${count()} doubled ${doubled()}`}
+    </button>
+  );
+}
+
 function App() {
   const [broken, setBroken] = createSignal(false);
 
   return (
     <main>
       <p id="fixture-content">app content</p>
+      <Greeting name="ada" />
+      <Counter />
       <button id="emit-server-function-request" onClick={emitServerFunctionRequest}>
         emit server function request
       </button>
