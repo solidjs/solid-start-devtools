@@ -98,6 +98,16 @@ test('maps the ownership tree', async ({ page }) => {
   await expect(detail).toContainText('Props (1)');
   await expect(detail).toContainText('name');
 
+  // The ancestry section lists the owners above the selection, nearest first.
+  const frames = detail.locator('[data-solid-ownership-frame]');
+  await expect(frames).toHaveCount(2);
+  await expect(frames.first()).toContainText('<Greeting>');
+  await expect(frames.nth(1)).toContainText('<App>');
+
+  // Clicking a frame walks up the tree.
+  await frames.nth(1).click();
+  await expect(detail.locator('[data-solid-ownership-detail-head]')).toContainText('<App>');
+
   // Owner mode adds the scopes that component mode folds away.
   await page.getByRole('button', { name: 'Owners', exact: true }).click();
   await expect(rows.filter({ hasText: 'doubled' })).toHaveCount(1);

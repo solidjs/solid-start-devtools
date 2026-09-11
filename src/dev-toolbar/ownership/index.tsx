@@ -151,14 +151,18 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
     return id ? byId().get(id) : undefined;
   });
 
-  const selectedPath = createMemo(() => {
+  const ancestry = createMemo<TreeNode[]>(() => {
     const id = selected();
     if (!id) return [];
     const nodes = byId();
-    return ancestorsOf(nodes, id)
-      .map((parent) => nodes.get(parent)?.name)
-      .filter((name): name is string => !!name)
-      .reverse();
+    const current = nodes.get(id);
+    if (!current) return [];
+    const frames = [current];
+    for (const parent of ancestorsOf(nodes, id)) {
+      const owner = nodes.get(parent);
+      if (owner) frames.push(owner);
+    }
+    return frames;
   });
 
   return (
@@ -326,12 +330,6 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                         )}
                       </Show>
 
-                      <Show when={selectedPath().length > 0}>
-                        <Text data-solid-ownership-path options={{ size: 'xs', font: 'mono' }}>
-                          {selectedPath().join(' › ')}
-                        </Text>
-                      </Show>
-
                       <Show when={node().hasValue}>
                         <div data-solid-ownership-detail-block>
                           <Text options={{ size: 'xs', weight: 'semibold' }}>Value</Text>
@@ -474,6 +472,46 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                             )}
                           </For>
                         </div>
+                      </div>
+
+                      <div data-solid-ownership-detail-block>
+                        <Text options={{ size: 'xs', weight: 'semibold' }}>
+                          {`Ancestry (${ancestry().length})`}
+                        </Text>
+                        <div data-solid-ownership-stack>
+                          <For each={ancestry()}>
+                            {(frame, index) => (
+                              <button
+                                type="button"
+                                data-solid-ownership-frame
+                                data-current={index() === 0 ? '' : undefined}
+                                onClick={() => setSelected(frame.id)}
+                              >
+                                <span data-solid-ownership-frame-index>{`${index()}`}</span>
+                                <span data-solid-ownership-kind={frame.kind} />
+                                <Text
+                                  data-solid-ownership-frame-name
+                                  options={{ size: 'xs', weight: 'semibold', font: 'mono' }}
+                                >
+                                  {frame.name}
+                                </Text>
+                                <Show when={frame.location}>
+                                  {(location) => (
+                                    <Text
+                                      data-solid-ownership-frame-location
+                                      options={{ size: 'xs', font: 'mono', wrap: 'nowrap' }}
+                                    >
+                                      {location()}
+                                    </Text>
+                                  )}
+                                </Show>
+                              </button>
+                            )}
+                          </For>
+                        </div>
+                        <Text data-solid-ownership-note options={{ size: 'xs' }}>
+                          The owners this one was created under, nearest first.
+                        </Text>
                       </div>
                     </div>
                   )}

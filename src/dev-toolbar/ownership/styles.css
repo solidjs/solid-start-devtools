@@ -307,10 +307,6 @@
   background: var(--start-dt-surface-hover);
 }
 
-[data-solid-ownership-path] {
-  color: var(--start-dt-text-muted);
-}
-
 [data-solid-ownership-detail-block] {
   display: flex;
   flex-direction: column;
@@ -375,6 +371,69 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+[data-solid-ownership-stack] {
+  display: flex;
+  flex-direction: column;
+
+  gap: 0.125rem;
+}
+
+[data-solid-ownership-frame] {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+
+  gap: 0.375rem;
+
+  padding: 0.1875rem 0.375rem;
+
+  border: none;
+  border-radius: 0.375rem;
+  background: none;
+  color: var(--start-dt-text);
+
+  text-align: left;
+  cursor: pointer;
+
+  min-width: 0;
+}
+
+[data-solid-ownership-frame]:hover {
+  background: var(--start-dt-surface-hover);
+}
+
+[data-solid-ownership-frame][data-current] {
+  background: var(--start-dt-surface-active);
+}
+
+[data-solid-ownership-frame-index] {
+  width: 1rem;
+  flex-shrink: 0;
+
+  color: var(--start-dt-text-muted);
+
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.625rem;
+  text-align: right;
+}
+
+[data-solid-ownership-frame-name] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-solid-ownership-frame-location] {
+  margin-left: auto;
+
+  color: var(--start-dt-text-muted);
+
+  direction: rtl;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 55%;
 }
 
 [data-solid-ownership-chips] {

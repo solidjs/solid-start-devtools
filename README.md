@@ -46,7 +46,8 @@ above, so a component shows every signal, memo and effect created inside it. Own
 shows every owner instead, including roots, memos and effects.
 
 Selecting a row lists its prop names, the signals it holds with their values, the scopes
-folded into it and its children. Prop values are getters, so the panel lists their names
+folded into it, its children, and the ancestry it was created under. Every frame of the
+ancestry is clickable, so you can walk back up the tree. Prop values are getters, so the panel lists their names
 and never reads them.
 
 A component also shows where it is declared. The location comes from the hot reload
