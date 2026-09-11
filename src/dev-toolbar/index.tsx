@@ -1,22 +1,36 @@
 import type { JSX } from '@solidjs/web';
 import { clientOnly, httpStatus, isServer, Portal } from '@solidjs/web';
-import { createEffect, createSignal, Errored, onSettled } from 'solid-js';
+import { createEffect, createSignal, Errored, getOwner, onSettled } from 'solid-js';
 import { Toolbar } from 'terracotta/toolbar';
 import version from '../version.js';
 import IconButton from '../ui/IconButton.js';
 import { Text } from '../ui/Text.js';
 import { type ServerFunctionInstance, ServerFunctionViewer } from './functions/index.js';
 import { captureServerFunctionCall } from './functions/tracker.js';
-import { ErrorIcon, FunctionIcon, SolidIcon } from './icons.js';
+import { ErrorIcon, FunctionIcon, GraphIcon, SolidIcon } from './icons.js';
+import { excludeReactiveOwner, includeReactiveOwner } from './reactivity/registry.js';
 import './index.css';
 
 const ErrorViewer = clientOnly(() => import('./error-viewer/index.js'), { lazy: true });
+const ReactivityViewer = clientOnly(() => import('./reactivity/index.js'), { lazy: true });
 
 export interface DevToolbarProps {
   children?: JSX.Element;
 }
 
+/**
+ * Owns the app the toolbar wraps. Everything created here counts as app code,
+ * even though the toolbar's own scope encloses it.
+ */
+function AppScope(props: { children?: JSX.Element }): JSX.Element {
+  includeReactiveOwner(getOwner());
+  return <>{props.children}</>;
+}
+
 export function DevToolbar(props: DevToolbarProps) {
+  // Everything the toolbar creates stays out of the reactivity graph it renders.
+  excludeReactiveOwner(getOwner());
+
   const [ref, setRef] = createSignal<HTMLElement>();
 
   createEffect(
@@ -123,9 +137,9 @@ export function DevToolbar(props: DevToolbarProps) {
     },
   );
 
-  const [content, setContent] = createSignal<'fn' | 'err' | undefined>(undefined);
+  const [content, setContent] = createSignal<'fn' | 'err' | 'rx' | undefined>(undefined);
 
-  function toggleContent(value: 'fn' | 'err') {
+  function toggleContent(value: 'fn' | 'err' | 'rx') {
     if (content() === value) {
       setContent(undefined);
     } else {
@@ -197,6 +211,9 @@ export function DevToolbar(props: DevToolbarProps) {
               <IconButton onClick={() => toggleContent('fn')}>
                 <FunctionIcon title="View Server Functions" />
               </IconButton>
+              <IconButton onClick={() => toggleContent('rx')}>
+                <GraphIcon title="View Reactivity Graph" />
+              </IconButton>
             </div>
             <div>
               <SolidIcon title="Start Devtools Version" />
@@ -208,6 +225,7 @@ export function DevToolbar(props: DevToolbarProps) {
             </div>
           </Toolbar>
           <ErrorViewer show={content() === 'err'} errors={errors()} resetError={resetError} />
+          <ReactivityViewer show={content() === 'rx'} />
           <ServerFunctionViewer
             show={content() === 'fn'}
             instances={instances()}
@@ -229,7 +247,7 @@ export function DevToolbar(props: DevToolbarProps) {
           return <></>;
         }}
       >
-        {props.children}
+        <AppScope>{props.children}</AppScope>
       </Errored>
     </>
   );
