@@ -67,12 +67,14 @@ function assignLayers(nodes: LayoutInput[], incoming: Map<string, string[]>): Ma
 /**
  * Orders nodes inside each layer so edges cross as little as possible. Each
  * sweep moves a node towards the average position of its neighbours in the
- * previous layer.
+ * previous layer. Ties keep the order the node had in the last layout, so a
+ * node that gained no neighbours stays where the reader last saw it.
  */
 function orderLayers(
   columns: string[][],
   edges: ReactiveEdge[],
   layers: Map<string, number>,
+  rank: (id: string) => number,
 ): void {
   const sourcesOf = new Map<string, string[]>();
   const targetsOf = new Map<string, string[]>();
@@ -101,7 +103,9 @@ function orderLayers(
         for (const other of related) total += positions.get(other) ?? 0;
         scores.set(id, total / related.length);
       });
-      column.sort((a, b) => scores.get(a)! - scores.get(b)! || a.localeCompare(b));
+      column.sort(
+        (a, b) => scores.get(a)! - scores.get(b)! || rank(a) - rank(b) || a.localeCompare(b),
+      );
       column.forEach((id, index) => positions.set(id, index));
     }
   }
@@ -114,8 +118,37 @@ function orderLayers(
   }
 }
 
-/** Places nodes on a left to right grid, one column per layer. */
-export function layoutGraph(nodes: LayoutInput[], edges: ReactiveEdge[]): GraphLayout {
+/**
+ * Restores the order known nodes had, keeping new nodes at the position the
+ * crossing sweeps chose for them.
+ */
+function keepKnownOrder(column: string[], rank: (id: string) => number, newNode: number): string[] {
+  const swept = new Map(column.map((id, index) => [id, index]));
+  const known = column.filter((id) => rank(id) !== newNode).sort((a, b) => rank(a) - rank(b));
+  const fresh = column.filter((id) => rank(id) === newNode);
+
+  const out = [...known];
+  for (const id of fresh) {
+    const target = swept.get(id)!;
+    let index = 0;
+    while (index < out.length && swept.get(out[index]!)! < target) index++;
+    out.splice(index, 0, id);
+  }
+  return out;
+}
+
+/**
+ * Places nodes on a left to right grid, one column per layer.
+ *
+ * Pass the layout this one replaces to keep the result stable: nodes hold the
+ * slot they had, and new ones land after them. Without it the graph reshuffles
+ * on every snapshot, which is the one thing a live view must not do.
+ */
+export function layoutGraph(
+  nodes: LayoutInput[],
+  edges: ReactiveEdge[],
+  previous?: GraphLayout,
+): GraphLayout {
   const incoming = incomingEdges(nodes, edges);
   const layers = assignLayers(nodes, incoming);
 
@@ -134,22 +167,41 @@ export function layoutGraph(nodes: LayoutInput[], edges: ReactiveEdge[]): GraphL
   const columns: string[][] = Array.from({ length: columnCount }, () => []);
   for (const node of nodes) columns[layers.get(node.id)!]!.push(node.id);
 
-  orderLayers(columns, edges, layers);
+  // A node the last layout did not have sorts after the ones it did.
+  const NEW_NODE = Number.MAX_SAFE_INTEGER;
+  const previousIndex = new Map<string, number>();
+  if (previous) {
+    for (const [id, node] of previous.nodes) previousIndex.set(id, node.index);
+  }
+  const rank = (id: string) => previousIndex.get(id) ?? NEW_NODE;
+
+  for (const column of columns) {
+    column.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  }
+
+  orderLayers(columns, edges, layers, rank);
+
+  // The sweeps are free to reorder anything, which would move nodes the reader
+  // is looking at. Keep the order known nodes already had, and slot the new
+  // ones in where the sweeps put them.
+  columns.forEach((column, index) => {
+    columns[index] = keepKnownOrder(column, rank, NEW_NODE);
+  });
 
   const tallest = columns.reduce((max, column) => Math.max(max, column.length), 0);
   const contentHeight = tallest * NODE_HEIGHT + Math.max(tallest - 1, 0) * ROW_GAP;
 
+  // Columns hang from the top. Centring them would move every column whenever
+  // one of them grew.
   const placed = new Map<string, LayoutNode>();
   columns.forEach((column, layer) => {
-    const columnHeight = column.length * NODE_HEIGHT + Math.max(column.length - 1, 0) * ROW_GAP;
-    const offset = (contentHeight - columnHeight) / 2;
     column.forEach((id, index) => {
       placed.set(id, {
         id,
         layer,
         index,
         x: PADDING + layer * (NODE_WIDTH + LAYER_GAP),
-        y: PADDING + offset + index * (NODE_HEIGHT + ROW_GAP),
+        y: PADDING + index * (NODE_HEIGHT + ROW_GAP),
       });
     });
   });

@@ -75,6 +75,40 @@ describe('layoutGraph', () => {
     expect(layout.layers).toBe(1);
   });
 
+  it('keeps a node in its slot when another node appears', () => {
+    const first = layoutGraph([node('a'), node('b')], []);
+    const second = layoutGraph([node('a'), node('b'), node('c')], [], first);
+
+    expect(second.nodes.get('a')!.y).toBe(first.nodes.get('a')!.y);
+    expect(second.nodes.get('b')!.y).toBe(first.nodes.get('b')!.y);
+    expect(second.nodes.get('c')!.index).toBe(2);
+  });
+
+  it('keeps the previous order when the caller passes the nodes in another order', () => {
+    const first = layoutGraph([node('a'), node('b')], []);
+    const second = layoutGraph([node('b'), node('a')], [], first);
+
+    expect(second.nodes.get('a')!.index).toBe(0);
+    expect(second.nodes.get('b')!.index).toBe(1);
+  });
+
+  it('does not move one column when another column grows', () => {
+    const edges = [{ from: 'a', to: 'out' }];
+    const first = layoutGraph([node('a'), node('out')], edges);
+    const second = layoutGraph([node('a'), node('b'), node('c'), node('out')], edges, first);
+
+    expect(second.nodes.get('out')!.y).toBe(first.nodes.get('out')!.y);
+  });
+
+  it('gives the same layout for the same graph', () => {
+    const nodes = [node('a'), node('b'), node('c')];
+    const edges = [{ from: 'a', to: 'c' }];
+    const first = layoutGraph(nodes, edges);
+    const second = layoutGraph(nodes, edges);
+
+    expect([...second.nodes.entries()]).toEqual([...first.nodes.entries()]);
+  });
+
   it('reports an empty layout for an empty graph', () => {
     const layout = layoutGraph([], []);
 

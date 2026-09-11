@@ -6,7 +6,7 @@ import Placeholder from '../../ui/Placeholder.js';
 import { Text } from '../../ui/Text.js';
 import { FitIcon, GraphIcon, PauseIcon, PlayIcon } from '../icons.js';
 import { formatValue, typeName } from './format.js';
-import { edgePath, layoutGraph, NODE_HEIGHT, NODE_WIDTH } from './layout.js';
+import { edgePath, layoutGraph, NODE_HEIGHT, NODE_WIDTH, type GraphLayout } from './layout.js';
 import { ValueInspector } from './ValueInspector.js';
 import {
   EMPTY_GRAPH,
@@ -158,12 +158,17 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
     return graph().edges.filter((edge) => ids.has(edge.from) && ids.has(edge.to));
   });
 
-  const layout = createMemo(() =>
-    layoutGraph(
+  // Each layout is seeded with the one it replaces, so nodes keep their slot
+  // as the graph grows instead of jumping around under the pointer.
+  let lastLayout: GraphLayout | undefined;
+  const layout = createMemo(() => {
+    lastLayout = layoutGraph(
       visibleNodes().map((node) => ({ id: node.id, name: node.name, kind: node.kind })),
       visibleEdges(),
-    ),
-  );
+      lastLayout,
+    );
+    return lastLayout;
+  });
 
   const nodesById = createMemo(() => new Map(visibleNodes().map((node) => [node.id, node])));
 
