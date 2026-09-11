@@ -160,7 +160,7 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
 
   const layout = createMemo(() =>
     layoutGraph(
-      visibleNodes().map((node) => ({ id: node.id, name: node.name })),
+      visibleNodes().map((node) => ({ id: node.id, name: node.name, kind: node.kind })),
       visibleEdges(),
     ),
   );

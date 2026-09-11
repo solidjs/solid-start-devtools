@@ -1,4 +1,4 @@
-import type { ReactiveEdge } from './registry.js';
+import type { ReactiveEdge, ReactiveNodeKind } from './registry.js';
 
 export const NODE_WIDTH = 150;
 export const NODE_HEIGHT = 44;
@@ -9,7 +9,10 @@ export const PADDING = 24;
 export interface LayoutInput {
   id: string;
   name: string;
+  kind: ReactiveNodeKind;
 }
+
+const EFFECT_KINDS = new Set<ReactiveNodeKind>(['effect', 'render-effect', 'tracked-effect']);
 
 export interface LayoutNode {
   id: string;
@@ -26,15 +29,19 @@ export interface GraphLayout {
   layers: number;
 }
 
-/** Layer of each node, measured as the longest path from a node with no sources. */
-function assignLayers(nodes: LayoutInput[], edges: ReactiveEdge[]): Map<string, number> {
+/** Sources of each node, ignoring edges that point outside the given nodes. */
+function incomingEdges(nodes: LayoutInput[], edges: ReactiveEdge[]): Map<string, string[]> {
   const incoming = new Map<string, string[]>();
   for (const node of nodes) incoming.set(node.id, []);
   for (const edge of edges) {
     if (!incoming.has(edge.from) || !incoming.has(edge.to)) continue;
     incoming.get(edge.to)!.push(edge.from);
   }
+  return incoming;
+}
 
+/** Layer of each node, measured as the longest path from a node with no sources. */
+function assignLayers(nodes: LayoutInput[], incoming: Map<string, string[]>): Map<string, number> {
   const layers = new Map<string, number>();
   const visiting = new Set<string>();
 
@@ -109,7 +116,20 @@ function orderLayers(
 
 /** Places nodes on a left to right grid, one column per layer. */
 export function layoutGraph(nodes: LayoutInput[], edges: ReactiveEdge[]): GraphLayout {
-  const layers = assignLayers(nodes, edges);
+  const incoming = incomingEdges(nodes, edges);
+  const layers = assignLayers(nodes, incoming);
+
+  // An effect that subscribes to nothing reads nothing, so it does not belong
+  // in the column the signals start from. It gets a column of its own before
+  // them, which keeps the first signal column about sources of data.
+  const detached = nodes.filter(
+    (node) => EFFECT_KINDS.has(node.kind) && incoming.get(node.id)!.length === 0,
+  );
+  if (detached.length > 0) {
+    for (const [id, layer] of layers) layers.set(id, layer + 1);
+    for (const node of detached) layers.set(node.id, 0);
+  }
+
   const columnCount = nodes.length === 0 ? 0 : Math.max(...layers.values()) + 1;
   const columns: string[][] = Array.from({ length: columnCount }, () => []);
   for (const node of nodes) columns[layers.get(node.id)!]!.push(node.id);

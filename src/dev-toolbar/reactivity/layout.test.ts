@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { edgePath, layoutGraph, LAYER_GAP, NODE_HEIGHT, NODE_WIDTH } from './layout.js';
 
-const node = (id: string) => ({ id, name: id });
+const node = (id: string) => ({ id, name: id, kind: 'signal' as const });
+const effect = (id: string) => ({ id, name: id, kind: 'effect' as const });
 
 describe('layoutGraph', () => {
   it('places a node with no sources in the first column', () => {
@@ -51,6 +52,27 @@ describe('layoutGraph', () => {
     const second = layout.nodes.get('b')!;
 
     expect(Math.abs(second.y - first.y)).toBeGreaterThanOrEqual(NODE_HEIGHT);
+  });
+
+  it('puts an effect that subscribes to nothing before the signals', () => {
+    const layout = layoutGraph([node('a'), effect('lonely'), node('b')], [{ from: 'a', to: 'b' }]);
+
+    expect(layout.nodes.get('lonely')!.layer).toBe(0);
+    expect(layout.nodes.get('a')!.layer).toBe(1);
+    expect(layout.nodes.get('b')!.layer).toBe(2);
+  });
+
+  it('leaves an effect with sources where its sources put it', () => {
+    const layout = layoutGraph([node('a'), effect('watcher')], [{ from: 'a', to: 'watcher' }]);
+
+    expect(layout.nodes.get('a')!.layer).toBe(0);
+    expect(layout.nodes.get('watcher')!.layer).toBe(1);
+  });
+
+  it('keeps one column when every node is a detached effect', () => {
+    const layout = layoutGraph([effect('one'), effect('two')], []);
+
+    expect(layout.layers).toBe(1);
   });
 
   it('reports an empty layout for an empty graph', () => {

@@ -89,6 +89,21 @@ test('maps the reactivity graph', async ({ page }) => {
   await expect(nodes.filter({ hasText: /^doubled/ }).first()).toBeVisible();
   await expect(nodes.filter({ hasText: /^report-doubled/ }).first()).toBeVisible();
 
+  // Effects that subscribe to nothing sit in their own column before the signals.
+  const columns = await nodes.evaluateAll((elements) =>
+    elements.map((element) => ({
+      x: Math.round(element.getBoundingClientRect().x),
+      kind: (element as HTMLElement).dataset.kind,
+    })),
+  );
+  const leftmost = Math.min(...columns.map((entry) => entry.x));
+  expect(
+    columns
+      .filter((entry) => entry.x === leftmost)
+      .every((entry) => entry.kind?.includes('effect')),
+  ).toBe(true);
+  expect(columns.some((entry) => entry.kind === 'signal' && entry.x > leftmost)).toBe(true);
+
   // Hovering a node explains it without selecting it.
   await count.hover();
   const card = page.locator('[data-solid-reactivity-hovercard]');
