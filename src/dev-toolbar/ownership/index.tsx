@@ -16,6 +16,14 @@ import {
 import { ancestorsOf, EMPTY_TREE, type OwnershipTree, type TreeNode } from './tree.js';
 import './styles.css';
 
+/**
+ * Asks the dev server to open the file. Vite serves this endpoint in
+ * development. A failure is ignored, since the panel has nowhere to report it.
+ */
+function openInEditor(location: string): void {
+  void fetch(`/__open-in-editor?file=${encodeURIComponent(location)}`).catch(() => {});
+}
+
 /** How long a row stays marked as new after it first appears. */
 const FRESH_MS = 900;
 
@@ -302,6 +310,21 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                         </Text>
                         <Badge type="info">{node().kind}</Badge>
                       </div>
+
+                      <Show when={node().location}>
+                        {(location) => (
+                          <button
+                            type="button"
+                            data-solid-ownership-location
+                            title="Open in editor"
+                            onClick={() => openInEditor(location())}
+                          >
+                            <Text options={{ size: 'xs', font: 'mono', wrap: 'nowrap' }}>
+                              {location()}
+                            </Text>
+                          </button>
+                        )}
+                      </Show>
 
                       <Show when={selectedPath().length > 0}>
                         <Text data-solid-ownership-path options={{ size: 'xs', font: 'mono' }}>

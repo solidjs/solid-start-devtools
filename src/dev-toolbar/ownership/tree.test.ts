@@ -93,6 +93,7 @@ describe('ownerName', () => {
 
   it('falls back to the kind when an owner has no name', () => {
     expect(ownerName(owner({ name: 'count' }), 'memo')).toBe('count');
+    expect(ownerName(owner({ name: '[solid-refresh]Counter' }), 'memo')).toBe('Counter');
     expect(ownerName(owner(), 'scope')).toBe('scope');
   });
 });
@@ -119,6 +120,17 @@ describe('buildOwnershipTree in component mode', () => {
     const tree = build([root]);
 
     expect(tree.nodes[0]!.signals.map((entry) => entry.name)).toEqual(['outer', 'inner']);
+  });
+
+  it('reads the source location the hot reload transform records', () => {
+    const root = owner({ component: 'App' });
+    root._component.fn.location = 'src/App.tsx:12:0';
+
+    expect(build([root]).nodes[0]!.location).toBe('src/App.tsx:12:0');
+  });
+
+  it('has no location for a component compiled without the transform', () => {
+    expect(build([owner({ component: 'App' })]).nodes[0]!.location).toBeUndefined();
   });
 
   it('lists prop names of a component', () => {

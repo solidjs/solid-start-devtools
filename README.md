@@ -49,6 +49,10 @@ Selecting a row lists its prop names, the signals it holds with their values, th
 folded into it and its children. Prop values are getters, so the panel lists their names
 and never reads them.
 
+A component also shows where it is declared. The location comes from the hot reload
+transform, which `@solidjs/vite-plugin` runs in development, so it is there without any
+extra setup. Clicking it asks the dev server to open the file in your editor.
+
 The panel reads the tree through the development hooks in `solid-js`, so it is empty in a
 production build of the runtime. It only watches while it is open.
 

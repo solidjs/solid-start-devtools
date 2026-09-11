@@ -287,6 +287,26 @@
   min-width: 0;
 }
 
+[data-solid-ownership-location] {
+  align-self: flex-start;
+
+  padding: 0.125rem 0.375rem;
+
+  border: var(--start-dt-border) 1px solid;
+  border-radius: 0.375rem;
+  background: var(--start-dt-surface);
+  color: var(--start-dt-accent);
+
+  cursor: pointer;
+
+  max-width: 100%;
+  overflow: hidden;
+}
+
+[data-solid-ownership-location]:hover {
+  background: var(--start-dt-surface-hover);
+}
+
 [data-solid-ownership-path] {
   color: var(--start-dt-text-muted);
 }
@@ -336,6 +356,17 @@
   gap: 0.375rem;
 
   min-width: 0;
+  overflow: hidden;
+}
+
+[data-solid-ownership-scope-name] > [data-solid-text-size] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-solid-ownership-signal] > [data-solid-text-size]:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 [data-solid-ownership-signal-value] {

@@ -61,6 +61,8 @@ export interface TreeNode {
   disposed: boolean;
   /** Owners this node stands in for, when scopes are folded away. */
   scopes: FoldedScope[];
+  /** Where the component is declared, as `file:line:column`. */
+  location: string | undefined;
 }
 
 export interface OwnershipTree {
@@ -101,17 +103,32 @@ export function ownerKind(owner: RawNode): OwnerKind {
 /** The hot reload transform wraps components, and its wrapper carries the tag. */
 const REFRESH_PREFIX = '[solid-refresh]';
 
+function withoutRefreshTag(name: unknown): string | undefined {
+  if (typeof name !== 'string' || name.length === 0) return undefined;
+  return name.startsWith(REFRESH_PREFIX) ? name.slice(REFRESH_PREFIX.length) : name;
+}
+
 export function ownerName(owner: RawNode, kind: OwnerKind): string {
   if (kind === 'component') {
-    let name = owner._component?.name;
-    if (typeof name === 'string' && name.startsWith(REFRESH_PREFIX)) {
-      name = name.slice(REFRESH_PREFIX.length);
-    }
-    return `<${typeof name === 'string' && name.length > 0 ? name : 'Anonymous'}>`;
+    return `<${withoutRefreshTag(owner._component?.name) ?? 'Anonymous'}>`;
   }
-  const name = owner._name;
-  if (typeof name === 'string' && name.length > 0) return name;
-  return KIND_LABELS[kind];
+  // The memo the hot reload wrapper creates carries the same tag.
+  return withoutRefreshTag(owner._name) ?? KIND_LABELS[kind];
+}
+
+/**
+ * Where a component is declared.
+ *
+ * The hot reload transform records this on its wrapper, so it is there whenever
+ * a build runs that transform. Components compiled without it have no location.
+ */
+function componentLocation(owner: RawNode): string | undefined {
+  try {
+    const location = owner._component?.fn?.location;
+    return typeof location === 'string' && location.length > 0 ? location : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function propNames(owner: RawNode): string[] | undefined {
@@ -166,6 +183,7 @@ export function buildOwnershipTree(roots: RawNode[], options: BuildOptions): Own
       children: [],
       signals: [],
       props: kind === 'component' ? propNames(owner) : undefined,
+      location: kind === 'component' ? componentLocation(owner) : undefined,
       value: '_value' in owner ? owner._value : undefined,
       hasValue: '_value' in owner,
       disposed: isDisposed(owner),

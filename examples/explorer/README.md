@@ -26,5 +26,6 @@ and mounts the toolbar itself. `examples/explorer/src/App.tsx` is the whole app.
 1. Open the ownership panel and expand `routes` in the app. New rows appear and flash.
 2. Hide the preview. `<PreviewPane>` and the memo and effect it owns leave the tree.
 3. Select `<SelectionProvider>` and see the two signals every row depends on.
-4. Switch to owner mode to see the roots, memos and effects that component mode folds away.
-5. Search for `folder-stats` to find every folder memo at once.
+4. Click the file location under a component name to open it in your editor.
+5. Switch to owner mode to see the roots, memos and effects that component mode folds away.
+6. Search for `folder-stats` to find every folder memo at once.
