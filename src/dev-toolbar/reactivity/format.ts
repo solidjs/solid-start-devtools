@@ -84,32 +84,3 @@ export function formatValue(value: unknown, depth = 0): string {
   if (keys.length > MAX_ENTRIES) entries.push(`…${keys.length - MAX_ENTRIES} more`);
   return `${prefix}{ ${entries.join(', ')} }`;
 }
-
-/** Multi line view of a value for the details pane. Falls back to the preview. */
-export function formatValueDetail(value: unknown): string {
-  if (value === undefined || typeof value === 'function' || typeof value === 'symbol') {
-    return formatValue(value);
-  }
-  if (value instanceof Error) return `${value.name}: ${value.message}`;
-  if (typeof value !== 'object' || value === null) return formatValue(value);
-  try {
-    const seen = new WeakSet<object>();
-    const text = JSON.stringify(
-      value,
-      (_key, inner) => {
-        if (typeof inner === 'bigint') return `${inner}n`;
-        if (typeof inner === 'function') return formatValue(inner);
-        if (inner && typeof inner === 'object') {
-          if (seen.has(inner)) return '[circular]';
-          seen.add(inner);
-          if (typeof Node === 'function' && inner instanceof Node) return formatValue(inner);
-        }
-        return inner;
-      },
-      2,
-    );
-    return text ?? formatValue(value);
-  } catch {
-    return formatValue(value);
-  }
-}

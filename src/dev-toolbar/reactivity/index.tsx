@@ -5,8 +5,9 @@ import IconButton from '../../ui/IconButton.js';
 import Placeholder from '../../ui/Placeholder.js';
 import { Text } from '../../ui/Text.js';
 import { FitIcon, GraphIcon, PauseIcon, PlayIcon } from '../icons.js';
-import { formatValue, formatValueDetail, typeName } from './format.js';
+import { formatValue, typeName } from './format.js';
 import { edgePath, layoutGraph, NODE_HEIGHT, NODE_WIDTH } from './layout.js';
+import { ValueInspector } from './ValueInspector.js';
 import {
   EMPTY_GRAPH,
   excludeReactiveOwner,
@@ -531,14 +532,15 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
                     <div data-solid-reactivity-detail-content>
                       <NodeSummary node={node()} />
                       <div data-solid-reactivity-detail-block>
-                        <Text options={{ size: 'xs', weight: 'semibold' }}>Value</Text>
-                        <pre data-solid-reactivity-detail-value>
-                          <Text options={{ size: 'xs', font: 'mono' }}>
-                            {node().errored
-                              ? formatValueDetail(node().error)
-                              : formatValueDetail(node().value)}
-                          </Text>
-                        </pre>
+                        <Text options={{ size: 'xs', weight: 'semibold' }}>
+                          {node().errored ? 'Error' : 'Value'}
+                        </Text>
+                        <div data-solid-reactivity-detail-value>
+                          <ValueInspector
+                            value={node().errored ? node().error : node().value}
+                            open
+                          />
+                        </div>
                       </div>
                       <div data-solid-reactivity-detail-block>
                         <Text options={{ size: 'xs', weight: 'semibold' }}>

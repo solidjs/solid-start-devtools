@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatValue, formatValueDetail, typeName } from './format.js';
+import { formatValue, typeName } from './format.js';
 
 describe('formatValue', () => {
   it('formats primitives', () => {
@@ -49,23 +49,5 @@ describe('typeName', () => {
     expect(typeName({})).toBe('object');
     expect(typeName(new Date())).toBe('date');
     expect(typeName(1)).toBe('number');
-  });
-});
-
-describe('formatValueDetail', () => {
-  it('pretty prints objects', () => {
-    expect(formatValueDetail({ a: 1 })).toBe('{\n  "a": 1\n}');
-  });
-
-  it('survives circular values', () => {
-    const value: Record<string, unknown> = { name: 'root' };
-    value.self = value;
-
-    expect(formatValueDetail(value)).toContain('[circular]');
-  });
-
-  it('falls back to the preview for values JSON cannot hold', () => {
-    expect(formatValueDetail(undefined)).toBe('undefined');
-    expect(formatValueDetail(new Error('boom'))).toBe('Error: boom');
   });
 });

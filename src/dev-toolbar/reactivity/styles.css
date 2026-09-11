@@ -479,17 +479,14 @@
 }
 
 [data-solid-reactivity-detail-value] {
-  margin: 0;
-  padding: 0.5rem;
+  padding: 0.375rem 0.25rem;
 
-  max-height: 12rem;
+  max-height: 16rem;
   overflow: auto;
 
   border-radius: 0.5rem;
+  border: var(--start-dt-border-soft) 1px solid;
   background: var(--start-dt-bg);
-
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 [data-solid-reactivity-links] {

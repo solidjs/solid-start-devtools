@@ -41,8 +41,8 @@ pnpm demo
 
 The graph panel maps the running reactive graph. Signals, memos and effects are nodes,
 and an edge points from a source to the computation that reads it. Hover a node for its
-value, state and edge counts. Select one to dim the rest of the graph and list what it
-reads and what reads it.
+value, state and edge counts. Select one to dim the rest of the graph, list what it
+reads and what reads it, and inspect its value as an expandable tree.
 
 The panel reads the graph through the development hooks in `solid-js`, so it is empty in a
 production build of the runtime. It only watches while it is open.

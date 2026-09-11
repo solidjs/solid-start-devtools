@@ -112,7 +112,20 @@ test('maps the reactivity graph', async ({ page }) => {
   await expect(count).toContainText('1');
   await expect(nodes.filter({ hasText: /^doubled/ }).first()).toContainText('2');
 
+  // The value pane is the same expandable tree the server function viewer uses.
+  const tree = page.locator('[data-solid-reactivity-detail-value]');
+  await expect(tree.locator('[data-solid-value-token="number"]')).toHaveText('1');
+
+  await nodes
+    .filter({ hasText: /^effect\[/ })
+    .first()
+    .click();
+  await expect(tree.locator('[data-solid-value-tree-row]').first()).toContainText('array');
+  await expect(tree.locator('[data-solid-value-tree-key]').first()).toContainText('0');
+  await expect(tree).toContainText('<main>');
+
   // Filters drop a whole kind from the graph.
+  await count.click();
   await page.getByRole('button', { name: 'Memos' }).click();
   await expect(nodes.filter({ hasText: /^doubled/ })).toHaveCount(0);
   await expect(count).toBeVisible();
