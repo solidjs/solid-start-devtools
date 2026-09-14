@@ -137,6 +137,18 @@ function signalsOf(owner: RawNode): RawNode[] {
   }
 }
 
+/**
+ * Ids of an owner and every owner above it, nearest first. Another panel uses
+ * this to find the closest row the tree shows for a runtime node.
+ */
+export function ownerChainIds(owner: object): string[] {
+  const chain: string[] = [];
+  for (let current = owner as RawNode | null | undefined; current; current = current._parent) {
+    chain.push(identify(current));
+  }
+  return chain;
+}
+
 function rootOf(owner: RawNode): RawNode {
   let current = owner;
   while (current._parent) current = current._parent;

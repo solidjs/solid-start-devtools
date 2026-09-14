@@ -54,7 +54,11 @@ function stateBadge(node: ReactiveNode): JSX.Element {
   return <Badge type="success">clean</Badge>;
 }
 
-function NodeSummary(props: { node: ReactiveNode }): JSX.Element {
+function ownerText(node: ReactiveNode): string {
+  return node.ownerPath.length > 0 ? node.ownerPath.join(' › ') : 'unnamed owner';
+}
+
+function NodeSummary(props: { node: ReactiveNode; onOwner?: () => void }): JSX.Element {
   return (
     <>
       <div data-solid-reactivity-card-head>
@@ -84,10 +88,22 @@ function NodeSummary(props: { node: ReactiveNode }): JSX.Element {
           {`${props.node.sources.length} in / ${props.node.observers.length} out`}
         </Text>
       </div>
-      <Show when={props.node.ownerPath.length > 0}>
+      <Show when={props.node.owner}>
         <div data-solid-reactivity-card-row>
           <Text options={{ size: 'xs', weight: 'semibold', wrap: 'nowrap' }}>owner</Text>
-          <Text options={{ size: 'xs', font: 'mono' }}>{props.node.ownerPath.join(' › ')}</Text>
+          <Show
+            when={props.onOwner}
+            fallback={<Text options={{ size: 'xs', font: 'mono' }}>{ownerText(props.node)}</Text>}
+          >
+            <button
+              type="button"
+              data-solid-reactivity-owner
+              title="Show in the ownership tree"
+              onClick={() => props.onOwner?.()}
+            >
+              <Text options={{ size: 'xs', font: 'mono' }}>{ownerText(props.node)}</Text>
+            </button>
+          </Show>
         </div>
       </Show>
     </>
@@ -101,6 +117,8 @@ export interface ReactivityViewerProps {
    * so asking for the same node twice still moves the view.
    */
   focus?: { node: object };
+  /** Opens the owner of a node in the ownership tree. */
+  onViewOwner?: (owner: object) => void;
 }
 
 export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Element {
@@ -610,7 +628,23 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
                 {(node) => (
                   <aside data-solid-reactivity-detail>
                     <div data-solid-reactivity-detail-content>
-                      <NodeSummary node={node()} />
+                      <NodeSummary
+                        node={node()}
+                        onOwner={
+                          props.onViewOwner
+                            ? () => {
+                                // A signal lives inside its owner. A memo or effect is an
+                                // owner itself, so the tree can show it directly.
+                                const current = node();
+                                const anchor =
+                                  current.kind === 'signal' || current.kind === 'store'
+                                    ? current.owner
+                                    : current.raw;
+                                if (anchor) props.onViewOwner?.(anchor);
+                              }
+                            : undefined
+                        }
+                      />
                       <div data-solid-reactivity-detail-block>
                         <Text options={{ size: 'xs', weight: 'semibold' }}>
                           {node().errored ? 'Error' : 'Value'}

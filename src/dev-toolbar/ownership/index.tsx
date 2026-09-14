@@ -9,6 +9,7 @@ import { previewValue, typeName } from './format.js';
 import {
   excludeOwner,
   isOwnershipAvailable,
+  ownerChainIds,
   snapshotOwnershipTree,
   startOwnershipTracking,
   subscribeOwnershipTree,
@@ -39,6 +40,11 @@ export interface OwnershipViewerProps {
   show?: boolean;
   /** Opens a signal, memo or effect in the reactivity graph. */
   onViewInGraph?: (node: object) => void;
+  /**
+   * An owner another panel asked to show. Pass a new object for every request,
+   * so asking for the same owner twice still moves the tree.
+   */
+  focus?: { owner: object };
 }
 
 export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Element {
@@ -53,6 +59,8 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
   const [selected, setSelected] = createSignal<string>();
 
   const firstSeen = new Map<string, number>();
+  let appliedFocus: { owner: object } | undefined;
+  let rowsElement: HTMLDivElement | undefined;
 
   // Takes the mode as an argument because reading a signal inside an effect
   // callback is not tracked.
@@ -82,6 +90,27 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
     },
   );
 
+  // The graph can ask for an owner. The request selects the closest row the
+  // tree shows for it, opens the rows above that row, and waits for a snapshot
+  // that contains it.
+  createEffect(
+    () => ({ request: props.focus, nodes: tree().nodes, visible: !!props.show }),
+    ({ request, nodes, visible }) => {
+      if (!request || !visible || request === appliedFocus) return;
+      const known = new Map(nodes.map((node) => [node.id, node]));
+      const id = ownerChainIds(request.owner).find((candidate) => known.has(candidate));
+      if (!id) return;
+      appliedFocus = request;
+      const open = new Set([id, ...ancestorsOf(known, id)]);
+      setQuery('');
+      setCollapsed((current) => current.filter((item) => !open.has(item)));
+      setSelected(id);
+      // The row exists after this flush renders, so scroll on the next frame.
+      requestAnimationFrame(() => {
+        rowsElement?.querySelector(`[data-owner-id="${id}"]`)?.scrollIntoView({ block: 'nearest' });
+      });
+    },
+  );
   const byId = createMemo(() => new Map(tree().nodes.map((node) => [node.id, node])));
 
   const matches = createMemo(() => {
@@ -232,7 +261,12 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                 </Placeholder>
               }
             >
-              <div data-solid-ownership-rows>
+              <div
+                data-solid-ownership-rows
+                ref={(element) => {
+                  rowsElement = element;
+                }}
+              >
                 <Show
                   when={rows().length > 0}
                   fallback={
@@ -247,6 +281,7 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                     {(row) => (
                       <div
                         data-solid-ownership-row
+                        data-owner-id={row.node.id}
                         data-selected={selected() === row.node.id ? '' : undefined}
                         data-fresh={
                           Date.now() - (firstSeen.get(row.node.id) ?? 0) < FRESH_MS ? '' : undefined

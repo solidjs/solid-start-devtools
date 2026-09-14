@@ -557,3 +557,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* The owner path in the detail pane opens the ownership tree. */
+[data-solid-reactivity-owner] {
+  padding: 0;
+
+  border: none;
+  background: none;
+  color: var(--start-dt-accent);
+
+  text-align: left;
+  cursor: pointer;
+}
+
+[data-solid-reactivity-owner]:hover {
+  text-decoration: underline;
+}

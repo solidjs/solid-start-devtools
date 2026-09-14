@@ -148,6 +148,8 @@ export function DevToolbar(props: DevToolbarProps) {
   // A panel can ask the graph to show a node. Each request is a new object, so
   // asking for the same node twice still moves the view.
   const [graphFocus, setGraphFocus] = createSignal<{ node: object }>();
+  // The graph can ask the ownership tree to show an owner the same way.
+  const [ownershipFocus, setOwnershipFocus] = createSignal<{ owner: object }>();
 
   function toggleContent(value: 'fn' | 'err' | 'rx' | 'own') {
     if (content() === value) {
@@ -238,9 +240,17 @@ export function DevToolbar(props: DevToolbarProps) {
             </div>
           </Toolbar>
           <ErrorViewer show={content() === 'err'} errors={errors()} resetError={resetError} />
-          <ReactivityViewer show={content() === 'rx'} focus={graphFocus()} />
+          <ReactivityViewer
+            show={content() === 'rx'}
+            focus={graphFocus()}
+            onViewOwner={(owner) => {
+              setOwnershipFocus({ owner });
+              setContent('own');
+            }}
+          />
           <OwnershipViewer
             show={content() === 'own'}
+            focus={ownershipFocus()}
             onViewInGraph={(node) => {
               setGraphFocus({ node });
               setContent('rx');
