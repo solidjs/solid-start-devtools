@@ -228,6 +228,17 @@ test('maps the ownership tree', async ({ page }) => {
       return Math.abs(nodeBox.x + nodeBox.width / 2 - (canvasBox.x + canvasBox.width / 2));
     })
     .toBeLessThan(4);
+
+  // The graph keeps watching after the jump. The ownership panel stops in the
+  // same flush the graph starts, which used to take the graph's hooks away.
+  // The panel covers the page, so the click goes straight to the element.
+  await page.evaluate(() => (document.querySelector('#increment-count') as HTMLElement).click());
+  await expect(
+    page
+      .locator('[data-solid-reactivity-node]')
+      .filter({ hasText: /^count/ })
+      .first(),
+  ).toContainText('1');
 });
 
 test('mounts once and disposes', async ({ page }) => {

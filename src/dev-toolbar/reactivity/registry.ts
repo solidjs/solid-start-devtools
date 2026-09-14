@@ -1,4 +1,5 @@
 import { DEV } from 'solid-js';
+import { listenToDevHooks } from '../dev-hooks.js';
 
 // Flag bits used by @solidjs/signals. They are internal to the runtime, so the
 // values are copied here and every read is defensive.
@@ -99,7 +100,7 @@ const collected =
     : undefined;
 
 const listeners = new Set<() => void>();
-let uninstall: (() => void) | undefined;
+let stopListening: (() => void) | undefined;
 let watchers = 0;
 let frame: number | undefined;
 /** An owner inside the toolbar. The graph walk climbs from here to the app root. */
@@ -141,46 +142,29 @@ function notify(): void {
 }
 
 /**
- * Installs the devtools hooks on the reactive runtime. Existing hooks are kept
- * and still called, so other tools sharing the slot keep working.
+ * Starts watching the reactive runtime. The hooks are shared with the other
+ * panels through one hub, so panels can start and stop in any order.
  */
 export function startReactivityTracking(): () => void {
   if (!isReactivityAvailable()) return () => {};
   watchers++;
-  if (uninstall) return release;
-
-  const hooks = DEV!.hooks;
-  const previousOwner = hooks.onOwner;
-  const previousGraph = hooks.onGraph;
-  const previousUpdate = hooks.onUpdate;
-
-  hooks.onOwner = (owner) => {
-    previousOwner?.(owner);
-    track(owner as RawNode);
-    notify();
-  };
-  hooks.onGraph = (value, owner) => {
-    previousGraph?.(value, owner);
-    if (value && typeof value === 'object') {
-      if (owner) signalOwners.set(value, owner as RawNode);
-      track(value as RawNode);
-    }
-    notify();
-  };
-  hooks.onUpdate = () => {
-    previousUpdate?.();
-    recordUpdates();
-    notify();
-  };
-
-  uninstall = () => {
-    hooks.onOwner = previousOwner;
-    hooks.onGraph = previousGraph;
-    hooks.onUpdate = previousUpdate;
-    uninstall = undefined;
-    if (frame !== undefined) cancelAnimationFrame(frame);
-    frame = undefined;
-  };
+  stopListening ??= listenToDevHooks({
+    onOwner(owner) {
+      track(owner as RawNode);
+      notify();
+    },
+    onGraph(value, owner) {
+      if (value && typeof value === 'object') {
+        if (owner) signalOwners.set(value, owner as RawNode);
+        track(value as RawNode);
+      }
+      notify();
+    },
+    onUpdate() {
+      recordUpdates();
+      notify();
+    },
+  });
   return release;
 }
 
@@ -197,10 +181,14 @@ function recordUpdates(): void {
   }
 }
 
-/** Drops one watcher. The hooks come off once nothing watches any more. */
+/** Drops one watcher. Stops listening once nothing watches any more. */
 function release(): void {
   watchers = Math.max(0, watchers - 1);
-  if (watchers === 0) uninstall?.();
+  if (watchers > 0 || !stopListening) return;
+  stopListening();
+  stopListening = undefined;
+  if (frame !== undefined) cancelAnimationFrame(frame);
+  frame = undefined;
 }
 
 /** Calls `listener` after the graph changed, at most once per frame. */
