@@ -30,6 +30,8 @@ export interface OwnedSignal {
   id: string;
   name: string;
   value: unknown;
+  /** Clock tick of the last write, so a new value changes the fingerprint. */
+  time: number;
   /** The runtime node, so another panel can find the same signal. */
   node: RawNode;
 }
@@ -41,6 +43,8 @@ export interface FoldedScope {
   name: string;
   value: unknown;
   hasValue: boolean;
+  /** Clock tick of the last recompute, so a new value changes the fingerprint. */
+  time: number;
   /** The runtime owner, so another panel can find the same memo or effect. */
   node: RawNode;
 }
@@ -62,6 +66,8 @@ export interface TreeNode {
   /** Current value of a computed owner. */
   value: unknown;
   hasValue: boolean;
+  /** Clock tick of the last recompute of a computed owner. */
+  time: number;
   disposed: boolean;
   /** Owners this node stands in for, when scopes are folded away. */
   scopes: FoldedScope[];
@@ -145,6 +151,11 @@ function propNames(owner: RawNode): string[] | undefined {
   }
 }
 
+/** The runtime clock of a node's last write. Zero for owners that hold no value. */
+function timeOf(node: RawNode): number {
+  return typeof node._time === 'number' ? node._time : 0;
+}
+
 function isDisposed(owner: RawNode): boolean {
   return typeof owner._flags === 'number' && (owner._flags & REACTIVE_DISPOSED) !== 0;
 }
@@ -190,6 +201,7 @@ export function buildOwnershipTree(roots: RawNode[], options: BuildOptions): Own
       location: kind === 'component' ? componentLocation(owner) : undefined,
       value: '_value' in owner ? owner._value : undefined,
       hasValue: '_value' in owner,
+      time: timeOf(owner),
       disposed: isDisposed(owner),
       scopes: [],
     };
@@ -206,6 +218,7 @@ export function buildOwnershipTree(roots: RawNode[], options: BuildOptions): Own
         id: options.identify(signal),
         name: typeof name === 'string' && name.length > 0 ? name : 'signal',
         value: signal._value,
+        time: timeOf(signal),
         node: signal,
       });
     }
@@ -250,6 +263,7 @@ export function buildOwnershipTree(roots: RawNode[], options: BuildOptions): Own
         name: ownerName(owner, kind),
         value: '_value' in owner ? owner._value : undefined,
         hasValue: '_value' in owner,
+        time: timeOf(owner),
         node: owner,
       });
       collectSignals(owner, host);
@@ -261,11 +275,13 @@ export function buildOwnershipTree(roots: RawNode[], options: BuildOptions): Own
 
   let fingerprint = `${nodes.length}:${topLevel.length}`;
   for (const node of nodes) {
-    fingerprint += `|${node.id}${node.kind}${node.children.length}${node.signals.length}${
-      node.scopes.length
-    }${node.disposed ? 'd' : ''}`;
-    for (const signal of node.signals) fingerprint += `,${signal.id}`;
-    for (const scope of node.scopes) fingerprint += `;${scope.id}`;
+    // Write times are part of it, so a value changing without the tree moving
+    // still renders.
+    fingerprint += `|${node.id}${node.kind}@${node.time}${node.children.length}${
+      node.signals.length
+    }${node.scopes.length}${node.disposed ? 'd' : ''}`;
+    for (const signal of node.signals) fingerprint += `,${signal.id}@${signal.time}`;
+    for (const scope of node.scopes) fingerprint += `;${scope.id}@${scope.time}`;
   }
 
   return { nodes, roots: topLevel, fingerprint };

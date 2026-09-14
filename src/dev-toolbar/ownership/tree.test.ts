@@ -114,6 +114,7 @@ describe('buildOwnershipTree in component mode', () => {
         name: 'total',
         value: 7,
         hasValue: true,
+        time: 0,
         node: memo,
       },
     ]);
@@ -214,6 +215,26 @@ describe('fingerprint', () => {
     const root = owner({ component: 'App' });
     const before = build([root]).fingerprint;
     root._signals = [signal('count', 0)];
+
+    expect(build([root]).fingerprint).not.toBe(before);
+  });
+
+  it('changes when a signal is written', () => {
+    const count = signal('count', 0);
+    const root = owner({ component: 'App', signals: [count] });
+    const before = build([root]).fingerprint;
+    count._value = 1;
+    count._time = 1;
+
+    expect(build([root]).fingerprint).not.toBe(before);
+  });
+
+  it('changes when a folded memo recomputes', () => {
+    const memo = owner({ memo: true, name: 'total', value: 1 });
+    const root = owner({ component: 'App', children: [memo] });
+    const before = build([root]).fingerprint;
+    memo._value = 2;
+    memo._time = 3;
 
     expect(build([root]).fingerprint).not.toBe(before);
   });
