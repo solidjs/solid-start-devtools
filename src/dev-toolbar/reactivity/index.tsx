@@ -6,7 +6,14 @@ import Placeholder from '../../ui/Placeholder.js';
 import { Text } from '../../ui/Text.js';
 import { FitIcon, GraphIcon, PauseIcon, PlayIcon } from '../icons.js';
 import { formatValue, typeName } from './format.js';
-import { edgePath, layoutGraph, NODE_HEIGHT, NODE_WIDTH, type GraphLayout } from './layout.js';
+import {
+  edgePath,
+  layoutGraph,
+  NODE_HEIGHT,
+  NODE_WIDTH,
+  placeHoverCard,
+  type GraphLayout,
+} from './layout.js';
 import { ValueInspector } from './ValueInspector.js';
 import {
   EMPTY_GRAPH,
@@ -355,6 +362,10 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
     );
   }
 
+  let hoverCardElement: HTMLDivElement | undefined;
+  // Measured after each render, so the next placement knows how tall the card is.
+  let hoverCardHeight = 160;
+
   const hoverCard = createMemo(() => {
     const id = hovered();
     if (!id || id === selected()) return undefined;
@@ -362,15 +373,25 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
     const position = layout().nodes.get(id);
     if (!node || !position) return undefined;
     const current = view();
-    const width = viewport?.clientWidth ?? 0;
-    const left = current.x + (position.x + NODE_WIDTH) * current.k + 12;
-    const flip = width > 0 && left + HOVER_CARD_WIDTH > width;
-    return {
-      node,
-      x: flip ? Math.max(8, current.x + position.x * current.k - HOVER_CARD_WIDTH - 12) : left,
-      y: Math.max(8, current.y + position.y * current.k - 8),
-    };
+    const placement = placeHoverCard({
+      node: {
+        left: current.x + position.x * current.k,
+        top: current.y + position.y * current.k,
+        width: NODE_WIDTH * current.k,
+        height: NODE_HEIGHT * current.k,
+      },
+      canvas: { width: viewport?.clientWidth ?? 0, height: viewport?.clientHeight ?? 0 },
+      card: { width: HOVER_CARD_WIDTH, height: hoverCardHeight },
+    });
+    return { node, placement };
   });
+
+  createEffect(
+    () => hoverCard(),
+    () => {
+      if (hoverCardElement) hoverCardHeight = hoverCardElement.offsetHeight;
+    },
+  );
 
   const selectedNode = createMemo(() => {
     const id = selected();
@@ -552,7 +573,15 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
                   {(card) => (
                     <div
                       data-solid-reactivity-hovercard
-                      style={{ left: `${card().x}px`, top: `${card().y}px` }}
+                      data-placement={card().placement.side}
+                      ref={(element) => {
+                        hoverCardElement = element;
+                      }}
+                      style={{
+                        left: `${card().placement.left}px`,
+                        top: `${card().placement.y}px`,
+                        '--start-dt-caret-x': `${card().placement.caret}px`,
+                      }}
                     >
                       <NodeSummary node={card().node} />
                     </div>

@@ -110,6 +110,13 @@ test('maps the reactivity graph', async ({ page }) => {
   await expect(card).toContainText('number');
   await expect(card).toContainText('2 out');
 
+  // The card sits above or below the node, never over it.
+  const cardBox = (await card.boundingBox())!;
+  const nodeBox = (await count.boundingBox())!;
+  expect(cardBox.y + cardBox.height <= nodeBox.y || cardBox.y >= nodeBox.y + nodeBox.height).toBe(
+    true,
+  );
+
   // Selecting a node lists what reads it and dims the rest of the graph.
   await count.click();
   const detail = page.locator('[data-solid-reactivity-detail]');
