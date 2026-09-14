@@ -110,6 +110,16 @@ test('maps the reactivity graph', async ({ page }) => {
   await expect(card).toContainText('number');
   await expect(card).toContainText('2 out');
 
+  // The card sits above or below the node, never over it.
+  const cardBox = (await card.boundingBox())!;
+  const nodeBox = (await count.boundingBox())!;
+  expect(cardBox.y + cardBox.height <= nodeBox.y || cardBox.y >= nodeBox.y + nodeBox.height).toBe(
+    true,
+  );
+
+  // The detail pane only appears once a node is selected.
+  await expect(page.locator('[data-solid-reactivity-detail]')).toHaveCount(0);
+
   // Selecting a node lists what reads it and dims the rest of the graph.
   await count.click();
   const detail = page.locator('[data-solid-reactivity-detail]');
@@ -144,6 +154,141 @@ test('maps the reactivity graph', async ({ page }) => {
   await page.getByRole('button', { name: 'Memos' }).click();
   await expect(nodes.filter({ hasText: /^doubled/ })).toHaveCount(0);
   await expect(count).toBeVisible();
+
+  // The owner field opens the ownership tree on the component that owns the node.
+  if ((await count.getAttribute('data-solid-reactivity-node')) !== 'selected') {
+    await count.click();
+  }
+  // The path names the components the app declared, not the toolbar around it.
+  await expect(
+    page.locator('[data-solid-reactivity-detail] [data-solid-reactivity-owner]'),
+  ).toHaveText('<App> › <Counter>');
+  await page.locator('[data-solid-reactivity-detail] [data-solid-reactivity-owner]').click();
+  await expect(page.locator('[data-solid-ownership-row][data-selected]')).toContainText(
+    '<Counter>',
+  );
+});
+
+test('maps the ownership tree', async ({ page }) => {
+  await page.goto('/');
+  const toggle = page.getByRole('button', { name: 'View Ownership Tree' });
+  const rows = page.locator('[data-solid-ownership-name]');
+
+  await toggle.click();
+  await expect(rows).toHaveText(['<App>', '<Greeting>', '<Counter>', '<Show>']);
+
+  // The expand arrow keeps its full size inside the button.
+  const arrow = await page
+    .locator('[data-solid-ownership-chevron]')
+    .first()
+    .evaluate((element) => {
+      const style = getComputedStyle(element, '::before');
+      return [style.width, style.height];
+    });
+  expect(arrow).toEqual(['5px', '5px']);
+
+  // The detail pane only appears once an owner is selected.
+  await expect(page.locator('[data-solid-ownership-detail]')).toHaveCount(0);
+
+  // A component owns the signals and scopes created inside it.
+  await page.locator('[data-solid-ownership-label]').filter({ hasText: '<Counter>' }).click();
+  const detail = page.locator('[data-solid-ownership-detail]');
+  await expect(detail).toContainText('Signals (1)');
+  await expect(detail).toContainText('count');
+  await expect(detail).toContainText('doubled');
+
+  // Values stay live while the panel is open, even when the tree does not move.
+  // The panel covers the page, so the click goes straight to the element.
+  await page.evaluate(() => (document.querySelector('#increment-count') as HTMLElement).click());
+  await expect(
+    detail
+      .locator('[data-solid-ownership-signal]')
+      .filter({ has: page.getByText('count', { exact: true }) }),
+  ).toContainText('1');
+
+  // Props are listed by name, never read.
+  await page.locator('[data-solid-ownership-label]').filter({ hasText: '<Greeting>' }).click();
+  await expect(detail).toContainText('Props (1)');
+  await expect(detail).toContainText('name');
+
+  // The ancestry section lists the owners above the selection, nearest first.
+  const frames = detail.locator('[data-solid-ownership-frame]');
+  await expect(frames).toHaveCount(2);
+  await expect(frames.first()).toContainText('<Greeting>');
+  await expect(frames.nth(1)).toContainText('<App>');
+
+  // Clicking a frame walks up the tree.
+  await frames.nth(1).click();
+  await expect(detail.locator('[data-solid-ownership-detail-head]')).toContainText('<App>');
+
+  // Owner mode adds the scopes that component mode folds away.
+  await page.getByRole('button', { name: 'Owners', exact: true }).click();
+  await expect(rows.filter({ hasText: /^doubled$/ })).toHaveCount(1);
+
+  // Search keeps the ancestors of a match so the row stays reachable.
+  await page.getByRole('button', { name: 'Components', exact: true }).click();
+  await page.locator('[data-solid-ownership-search]').fill('doubled');
+  await expect(rows).toHaveText(['<App>', '<Counter>']);
+
+  // Rows carry no count badges.
+  await expect(page.locator('[data-solid-ownership-row] [data-solid-badge="info"]')).toHaveCount(0);
+
+  // A signal opens in the reactivity graph with that node selected.
+  await page.locator('[data-solid-ownership-search]').fill('');
+  await page.locator('[data-solid-ownership-label]').filter({ hasText: '<Counter>' }).click();
+  const countEntry = detail
+    .locator('[data-solid-ownership-signal]')
+    .filter({ has: page.getByText('count', { exact: true }) });
+  await countEntry.hover();
+  await countEntry.getByRole('button', { name: 'View in graph' }).click();
+  await expect(
+    page
+      .locator('[data-solid-reactivity-node]')
+      .filter({ hasText: /^count/ })
+      .first(),
+  ).toHaveAttribute('data-solid-reactivity-node', 'selected');
+
+  // The node lands in the middle of the canvas, measured after the detail pane
+  // has narrowed it.
+  await expect
+    .poll(async () => {
+      const canvasBox = (await page.locator('[data-solid-reactivity-canvas]').boundingBox())!;
+      const nodeBox = (await page
+        .locator('[data-solid-reactivity-node="selected"]')
+        .first()
+        .boundingBox())!;
+      return Math.abs(nodeBox.x + nodeBox.width / 2 - (canvasBox.x + canvasBox.width / 2));
+    })
+    .toBeLessThan(4);
+
+  // The graph keeps watching after the jump. The ownership panel stops in the
+  // same flush the graph starts, which used to take the graph's hooks away.
+  // The panel covers the page, so the click goes straight to the element.
+  await page.evaluate(() => (document.querySelector('#increment-count') as HTMLElement).click());
+  await expect(
+    page
+      .locator('[data-solid-reactivity-node]')
+      .filter({ hasText: /^count/ })
+      .first(),
+  ).toContainText('2');
+
+  // In owner mode a memo is a row of its own, and its heading links to the graph.
+  await toggle.click();
+  await page.getByRole('button', { name: 'Owners', exact: true }).click();
+  await page
+    .locator('[data-solid-ownership-label]')
+    .filter({ hasText: /^doubled$/ })
+    .click();
+  await detail
+    .locator('[data-solid-ownership-detail-head]')
+    .getByRole('button', { name: 'View in graph' })
+    .click();
+  await expect(
+    page
+      .locator('[data-solid-reactivity-node]')
+      .filter({ hasText: /^doubled/ })
+      .first(),
+  ).toHaveAttribute('data-solid-reactivity-node', 'selected');
 });
 
 test('mounts once and disposes', async ({ page }) => {

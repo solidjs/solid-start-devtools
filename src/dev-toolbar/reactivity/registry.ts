@@ -1,4 +1,5 @@
 import { DEV } from 'solid-js';
+import { listenToDevHooks } from '../dev-hooks.js';
 
 // Flag bits used by @solidjs/signals. They are internal to the runtime, so the
 // values are copied here and every read is defensive.
@@ -48,6 +49,10 @@ export interface ReactiveNode {
   error: unknown;
   /** Names of the owners above this node, outermost first. */
   ownerPath: string[];
+  /** The runtime node, so another panel can find the same node. */
+  raw: object;
+  /** The runtime owner the node was created under. */
+  owner: object | undefined;
   sources: string[];
   observers: string[];
   /** Times the node's clock advanced while the panel was open. */
@@ -99,7 +104,7 @@ const collected =
     : undefined;
 
 const listeners = new Set<() => void>();
-let uninstall: (() => void) | undefined;
+let stopListening: (() => void) | undefined;
 let watchers = 0;
 let frame: number | undefined;
 /** An owner inside the toolbar. The graph walk climbs from here to the app root. */
@@ -119,6 +124,11 @@ function idOf(node: RawNode): string {
   return id;
 }
 
+/** The graph's id for a runtime node, so another panel can point the graph at it. */
+export function reactiveNodeId(node: object): string {
+  return idOf(node as RawNode);
+}
+
 function track(node: RawNode | null | undefined): void {
   if (!node || typeof node !== 'object' || trackedRefs.has(node)) return;
   const ref = new WeakRef(node);
@@ -136,46 +146,29 @@ function notify(): void {
 }
 
 /**
- * Installs the devtools hooks on the reactive runtime. Existing hooks are kept
- * and still called, so other tools sharing the slot keep working.
+ * Starts watching the reactive runtime. The hooks are shared with the other
+ * panels through one hub, so panels can start and stop in any order.
  */
 export function startReactivityTracking(): () => void {
   if (!isReactivityAvailable()) return () => {};
   watchers++;
-  if (uninstall) return release;
-
-  const hooks = DEV!.hooks;
-  const previousOwner = hooks.onOwner;
-  const previousGraph = hooks.onGraph;
-  const previousUpdate = hooks.onUpdate;
-
-  hooks.onOwner = (owner) => {
-    previousOwner?.(owner);
-    track(owner as RawNode);
-    notify();
-  };
-  hooks.onGraph = (value, owner) => {
-    previousGraph?.(value, owner);
-    if (value && typeof value === 'object') {
-      if (owner) signalOwners.set(value, owner as RawNode);
-      track(value as RawNode);
-    }
-    notify();
-  };
-  hooks.onUpdate = () => {
-    previousUpdate?.();
-    recordUpdates();
-    notify();
-  };
-
-  uninstall = () => {
-    hooks.onOwner = previousOwner;
-    hooks.onGraph = previousGraph;
-    hooks.onUpdate = previousUpdate;
-    uninstall = undefined;
-    if (frame !== undefined) cancelAnimationFrame(frame);
-    frame = undefined;
-  };
+  stopListening ??= listenToDevHooks({
+    onOwner(owner) {
+      track(owner as RawNode);
+      notify();
+    },
+    onGraph(value, owner) {
+      if (value && typeof value === 'object') {
+        if (owner) signalOwners.set(value, owner as RawNode);
+        track(value as RawNode);
+      }
+      notify();
+    },
+    onUpdate() {
+      recordUpdates();
+      notify();
+    },
+  });
   return release;
 }
 
@@ -192,10 +185,14 @@ function recordUpdates(): void {
   }
 }
 
-/** Drops one watcher. The hooks come off once nothing watches any more. */
+/** Drops one watcher. Stops listening once nothing watches any more. */
 function release(): void {
   watchers = Math.max(0, watchers - 1);
-  if (watchers === 0) uninstall?.();
+  if (watchers > 0 || !stopListening) return;
+  stopListening();
+  stopListening = undefined;
+  if (frame !== undefined) cancelAnimationFrame(frame);
+  frame = undefined;
 }
 
 /** Calls `listener` after the graph changed, at most once per frame. */
@@ -274,17 +271,44 @@ function nameOf(node: RawNode, kind: ReactiveNodeKind): string {
   return KIND_LABELS[kind];
 }
 
-const DEFAULT_NAMES = new Set(Object.values(KIND_LABELS));
+// The runtime names an unnamed memo `computed`, which says as little as a kind label.
+const DEFAULT_NAMES = new Set([...Object.values(KIND_LABELS), 'computed']);
+
+/** The hot reload transform wraps components, and its wrapper carries this tag. */
+const REFRESH_PREFIX = '[solid-refresh]';
+
+/** The owner a node was created under. Signals keep it in the registry. */
+function ownerOf(node: RawNode): RawNode | undefined {
+  return ('_parent' in node ? node._parent : signalOwners.get(node)) ?? undefined;
+}
+
+/**
+ * The label an owner shows in a path. Components show their name. Owners that
+ * only carry a default kind name, and the memo the hot reload wrapper creates,
+ * say nothing about where the node lives, so they show nothing.
+ */
+function ownerLabel(owner: RawNode): string | undefined {
+  const component = owner._component?.name;
+  if (typeof component === 'string') {
+    const name = component.startsWith(REFRESH_PREFIX)
+      ? component.slice(REFRESH_PREFIX.length)
+      : component;
+    return `<${name || 'Anonymous'}>`;
+  }
+  const name = owner._name;
+  if (typeof name !== 'string' || name.length === 0) return undefined;
+  if (name.startsWith(REFRESH_PREFIX) || DEFAULT_NAMES.has(name)) return undefined;
+  return name;
+}
 
 function ownerPathOf(node: RawNode): string[] {
   const path: string[] = [];
-  let owner: RawNode | null | undefined =
-    '_parent' in node ? node._parent : (signalOwners.get(node) ?? null);
-  for (; owner; owner = owner._parent) {
-    const name = owner._name;
-    // Owners that only carry a default kind name say nothing about where the
-    // node lives, so the path keeps real labels only.
-    if (typeof name === 'string' && name.length > 0 && !DEFAULT_NAMES.has(name)) path.push(name);
+  for (let owner = ownerOf(node); owner; owner = owner._parent ?? undefined) {
+    // The scope that owns the app sits inside the toolbar. Everything above it
+    // is the toolbar's own wrapping, so the path stops there.
+    if (included.has(owner)) break;
+    const label = ownerLabel(owner);
+    if (label) path.push(label);
   }
   return path.reverse();
 }
@@ -433,6 +457,8 @@ export function snapshotReactivityGraph(options?: SnapshotOptions): ReactiveGrap
       lazy: (flags & REACTIVE_LAZY) !== 0,
       error: node._error,
       ownerPath: ownerPathOf(node),
+      raw: node,
+      owner: ownerOf(node),
       sources: [],
       observers: [],
       updates: entry.updates,

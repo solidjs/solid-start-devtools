@@ -217,6 +217,55 @@ export function layoutGraph(
   };
 }
 
+export interface HoverCardInput {
+  /** The hovered node's box, in canvas pixels. */
+  node: { left: number; top: number; width: number; height: number };
+  canvas: { width: number; height: number };
+  card: { width: number; height: number };
+  /** Space between the node and the card. */
+  gap?: number;
+  /** Space kept between the card and the canvas edge. */
+  margin?: number;
+}
+
+export interface HoverCardPlacement {
+  left: number;
+  /** The card's top edge when below the node, its bottom edge when above. */
+  y: number;
+  side: 'above' | 'below';
+  /** Where the caret points, measured from the card's left edge. */
+  caret: number;
+}
+
+/**
+ * Places the hover card under or over the node, never beside it. A card beside
+ * the node covers the nodes in the next column.
+ *
+ * The card prefers the side under the node. It moves over the node only when
+ * the space below is too short and the space above is larger.
+ */
+export function placeHoverCard(input: HoverCardInput): HoverCardPlacement {
+  const gap = input.gap ?? 8;
+  const margin = input.margin ?? 8;
+  const { node, canvas, card } = input;
+
+  const center = node.left + node.width / 2;
+  const maxLeft = Math.max(margin, canvas.width - card.width - margin);
+  const left = Math.min(Math.max(center - card.width / 2, margin), maxLeft);
+
+  const bottom = node.top + node.height;
+  const roomBelow = canvas.height - bottom - gap - margin;
+  const roomAbove = node.top - gap - margin;
+  const side = roomBelow >= card.height || roomBelow >= roomAbove ? 'below' : 'above';
+
+  return {
+    left,
+    y: side === 'below' ? bottom + gap : node.top - gap,
+    side,
+    caret: Math.min(Math.max(center - left, 12), card.width - 12),
+  };
+}
+
 /** Curve from the right edge of one node to the left edge of another. */
 export function edgePath(from: LayoutNode, to: LayoutNode): string {
   const startX = from.x + NODE_WIDTH;

@@ -1,0 +1,256 @@
+:root {
+  color-scheme: dark;
+
+  --bg: oklch(0.17 0.02 265);
+  --surface: oklch(0.22 0.02 265);
+  --surface-hover: oklch(0.27 0.025 265);
+  --border: oklch(0.31 0.02 265);
+  --text: oklch(0.94 0.005 265);
+  --muted: oklch(0.71 0.015 265);
+  --accent: oklch(0.68 0.13 245);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+.page {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 8rem;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.subtitle {
+  margin: 0.375rem 0 0;
+  max-width: 42rem;
+  color: var(--muted);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(16rem, 22rem) 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 48rem) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.explorer,
+.inspector {
+  border: var(--border) 1px solid;
+  border-radius: 0.75rem;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.explorer-head {
+  padding: 0.625rem 0.875rem;
+  border-bottom: var(--border) 1px solid;
+}
+
+.explorer-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+
+  padding: 0.375rem;
+  max-height: 26rem;
+  overflow: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  padding: 0.3125rem 0.5rem;
+
+  border: none;
+  border-radius: 0.375rem;
+  background: none;
+  color: var(--text);
+
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--surface-hover);
+}
+
+.row.active {
+  background: color-mix(in oklch, var(--accent) 22%, transparent);
+}
+
+.row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-name.folder {
+  font-weight: 600;
+}
+
+.row-meta {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.chevron {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+
+  border-right: 1.5px var(--muted) solid;
+  border-bottom: 1.5px var(--muted) solid;
+
+  transform: rotate(-45deg);
+  transition: transform 150ms ease;
+}
+
+.chevron.open {
+  transform: rotate(45deg);
+}
+
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+
+  border-radius: 9999px;
+  background: var(--muted);
+}
+
+.dot.lang-tsx {
+  background: oklch(0.72 0.13 245);
+}
+
+.dot.lang-ts {
+  background: oklch(0.74 0.12 260);
+}
+
+.dot.lang-css {
+  background: oklch(0.75 0.14 320);
+}
+
+.inspector {
+  display: flex;
+  flex-direction: column;
+  min-height: 20rem;
+}
+
+.inspector-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+
+  padding: 0.625rem 0.875rem;
+  border-bottom: var(--border) 1px solid;
+}
+
+.breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+}
+
+.crumb-sep {
+  color: var(--muted);
+}
+
+.toggle {
+  padding: 0.3125rem 0.75rem;
+
+  border: var(--border) 1px solid;
+  border-radius: 0.5rem;
+  background: var(--bg);
+  color: var(--text);
+
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toggle:hover {
+  background: var(--surface-hover);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.75rem;
+
+  padding: 0.875rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview {
+  margin: 0;
+  padding: 0.875rem;
+
+  border-top: var(--border) 1px solid;
+  background: var(--bg);
+  color: var(--muted);
+
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+
+  overflow: auto;
+}

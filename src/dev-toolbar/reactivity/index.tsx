@@ -6,11 +6,19 @@ import Placeholder from '../../ui/Placeholder.js';
 import { Text } from '../../ui/Text.js';
 import { FitIcon, GraphIcon, PauseIcon, PlayIcon } from '../icons.js';
 import { formatValue, typeName } from './format.js';
-import { edgePath, layoutGraph, NODE_HEIGHT, NODE_WIDTH, type GraphLayout } from './layout.js';
+import {
+  edgePath,
+  layoutGraph,
+  NODE_HEIGHT,
+  NODE_WIDTH,
+  placeHoverCard,
+  type GraphLayout,
+} from './layout.js';
 import { ValueInspector } from './ValueInspector.js';
 import {
   EMPTY_GRAPH,
   excludeReactiveOwner,
+  reactiveNodeId,
   isReactivityAvailable,
   snapshotReactivityGraph,
   startReactivityTracking,
@@ -46,7 +54,11 @@ function stateBadge(node: ReactiveNode): JSX.Element {
   return <Badge type="success">clean</Badge>;
 }
 
-function NodeSummary(props: { node: ReactiveNode }): JSX.Element {
+function ownerText(node: ReactiveNode): string {
+  return node.ownerPath.length > 0 ? node.ownerPath.join(' › ') : 'unnamed owner';
+}
+
+function NodeSummary(props: { node: ReactiveNode; onOwner?: () => void }): JSX.Element {
   return (
     <>
       <div data-solid-reactivity-card-head>
@@ -76,10 +88,22 @@ function NodeSummary(props: { node: ReactiveNode }): JSX.Element {
           {`${props.node.sources.length} in / ${props.node.observers.length} out`}
         </Text>
       </div>
-      <Show when={props.node.ownerPath.length > 0}>
+      <Show when={props.node.owner}>
         <div data-solid-reactivity-card-row>
           <Text options={{ size: 'xs', weight: 'semibold', wrap: 'nowrap' }}>owner</Text>
-          <Text options={{ size: 'xs', font: 'mono' }}>{props.node.ownerPath.join(' › ')}</Text>
+          <Show
+            when={props.onOwner}
+            fallback={<Text options={{ size: 'xs', font: 'mono' }}>{ownerText(props.node)}</Text>}
+          >
+            <button
+              type="button"
+              data-solid-reactivity-owner
+              title="Show in the ownership tree"
+              onClick={() => props.onOwner?.()}
+            >
+              <Text options={{ size: 'xs', font: 'mono' }}>{ownerText(props.node)}</Text>
+            </button>
+          </Show>
         </div>
       </Show>
     </>
@@ -88,6 +112,13 @@ function NodeSummary(props: { node: ReactiveNode }): JSX.Element {
 
 export interface ReactivityViewerProps {
   show?: boolean;
+  /**
+   * A node another panel asked to show. Pass a new object for every request,
+   * so asking for the same node twice still moves the view.
+   */
+  focus?: { node: object };
+  /** Opens the owner of a node in the ownership tree. */
+  onViewOwner?: (owner: object) => void;
 }
 
 export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Element {
@@ -106,6 +137,8 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
   let viewport: HTMLDivElement | undefined;
   let fittedSize = '';
   let moved = false;
+  let appliedFocus: { node: object } | undefined;
+  let centerFrame: number | undefined;
 
   function refresh(): void {
     const next = snapshotReactivityGraph();
@@ -242,6 +275,53 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
     });
   }
 
+  /** Moves the view so a node sits in the middle. False when the canvas is not there yet. */
+  function centerOn(position: { x: number; y: number }): boolean {
+    const box = viewport?.getBoundingClientRect();
+    if (!box || box.width === 0) return false;
+    moved = true;
+    setView((current) => ({
+      k: current.k,
+      x: box.width / 2 - (position.x + NODE_WIDTH / 2) * current.k,
+      y: box.height / 2 - (position.y + NODE_HEIGHT / 2) * current.k,
+    }));
+    return true;
+  }
+
+  /**
+   * Centers a node on the next frame. Selecting a node mounts the detail pane,
+   * which narrows the canvas, so measuring right away would center against the
+   * old width. A few frames are allowed for the layout to include the node.
+   */
+  function centerSoon(id: string, attempts = 5): void {
+    if (centerFrame !== undefined) cancelAnimationFrame(centerFrame);
+    centerFrame = requestAnimationFrame(() => {
+      centerFrame = undefined;
+      const position = lastLayout?.nodes.get(id);
+      if (position && centerOn(position)) return;
+      if (attempts > 1) centerSoon(id, attempts - 1);
+    });
+  }
+
+  // Another panel can ask for a node. Filters that would hide it are cleared,
+  // and the request waits for a snapshot that contains the node.
+  createEffect(
+    () => ({ request: props.focus, nodes: graph().nodes, visible: !!props.show }),
+    ({ request, nodes, visible }) => {
+      if (!request || !visible || request === appliedFocus) return;
+      const id = reactiveNodeId(request.node);
+      const target = nodes.find((node) => node.id === id);
+      if (!target) return;
+      appliedFocus = request;
+      setQuery('');
+      setHiddenKinds((current) => current.filter((kind) => kind !== target.kind));
+      setSelected(id);
+      // Keeps the auto fit from taking the view back before the frame runs.
+      moved = true;
+      centerSoon(id);
+    },
+  );
+
   // Refit while the graph grows. Once the user pans or zooms, the view is
   // theirs and only the fit button moves it.
   createEffect(
@@ -309,6 +389,10 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
     );
   }
 
+  let hoverCardElement: HTMLDivElement | undefined;
+  // Measured after each render, so the next placement knows how tall the card is.
+  let hoverCardHeight = 160;
+
   const hoverCard = createMemo(() => {
     const id = hovered();
     if (!id || id === selected()) return undefined;
@@ -316,15 +400,25 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
     const position = layout().nodes.get(id);
     if (!node || !position) return undefined;
     const current = view();
-    const width = viewport?.clientWidth ?? 0;
-    const left = current.x + (position.x + NODE_WIDTH) * current.k + 12;
-    const flip = width > 0 && left + HOVER_CARD_WIDTH > width;
-    return {
-      node,
-      x: flip ? Math.max(8, current.x + position.x * current.k - HOVER_CARD_WIDTH - 12) : left,
-      y: Math.max(8, current.y + position.y * current.k - 8),
-    };
+    const placement = placeHoverCard({
+      node: {
+        left: current.x + position.x * current.k,
+        top: current.y + position.y * current.k,
+        width: NODE_WIDTH * current.k,
+        height: NODE_HEIGHT * current.k,
+      },
+      canvas: { width: viewport?.clientWidth ?? 0, height: viewport?.clientHeight ?? 0 },
+      card: { width: HOVER_CARD_WIDTH, height: hoverCardHeight },
+    });
+    return { node, placement };
   });
+
+  createEffect(
+    () => hoverCard(),
+    () => {
+      if (hoverCardElement) hoverCardHeight = hoverCardElement.offsetHeight;
+    },
+  );
 
   const selectedNode = createMemo(() => {
     const id = selected();
@@ -506,7 +600,15 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
                   {(card) => (
                     <div
                       data-solid-reactivity-hovercard
-                      style={{ left: `${card().x}px`, top: `${card().y}px` }}
+                      data-placement={card().placement.side}
+                      ref={(element) => {
+                        hoverCardElement = element;
+                      }}
+                      style={{
+                        left: `${card().placement.left}px`,
+                        top: `${card().placement.y}px`,
+                        '--start-dt-caret-x': `${card().placement.caret}px`,
+                      }}
                     >
                       <NodeSummary node={card().node} />
                     </div>
@@ -522,20 +624,27 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
                 </Show>
               </div>
 
-              <aside data-solid-reactivity-detail>
-                <Show
-                  when={selectedNode()}
-                  fallback={
-                    <Placeholder>
-                      <Text options={{ size: 'xs' }}>
-                        Select a node to inspect its value and dependencies.
-                      </Text>
-                    </Placeholder>
-                  }
-                >
-                  {(node) => (
+              <Show when={selectedNode()}>
+                {(node) => (
+                  <aside data-solid-reactivity-detail>
                     <div data-solid-reactivity-detail-content>
-                      <NodeSummary node={node()} />
+                      <NodeSummary
+                        node={node()}
+                        onOwner={
+                          props.onViewOwner
+                            ? () => {
+                                // A signal lives inside its owner. A memo or effect is an
+                                // owner itself, so the tree can show it directly.
+                                const current = node();
+                                const anchor =
+                                  current.kind === 'signal' || current.kind === 'store'
+                                    ? current.owner
+                                    : current.raw;
+                                if (anchor) props.onViewOwner?.(anchor);
+                              }
+                            : undefined
+                        }
+                      />
                       <div data-solid-reactivity-detail-block>
                         <Text options={{ size: 'xs', weight: 'semibold' }}>
                           {node().errored ? 'Error' : 'Value'}
@@ -608,9 +717,9 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
                         </div>
                       </div>
                     </div>
-                  )}
-                </Show>
-              </aside>
+                  </aside>
+                )}
+              </Show>
             </Show>
           </div>
         </div>

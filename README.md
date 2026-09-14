@@ -7,6 +7,7 @@ Development error and server-function tooling for Solid Start mode.
 - Runtime error inspection with source-mapped stack frames.
 - Server-function request and response inspection.
 - A reactivity graph of the live signals, memos and effects in the app.
+- An ownership tree of the components and scopes the app created.
 
 ```sh
 pnpm add @solidjs/start-devtools@next
@@ -31,10 +32,14 @@ The same import is safe in development and production entries.
 
 ## Demo
 
-`examples/demo` is a small orders dashboard that exercises every panel.
+Two demo apps live in `examples`.
+
+- `examples/demo` is a small orders dashboard that exercises every panel.
+- `examples/explorer` is a file explorer whose component tree grows as you open folders.
 
 ```sh
 pnpm demo
+pnpm demo:explorer
 ```
 
 ## Reactivity graph
@@ -47,4 +52,24 @@ reads and what reads it, and inspect its value as an expandable tree.
 The panel reads the graph through the development hooks in `solid-js`, so it is empty in a
 production build of the runtime. It only watches while it is open.
 
-For component tree inspection, see [Solid Devtools](https://github.com/thetarnav/solid-devtools).
+## Ownership tree
+
+The ownership panel shows the app as a tree of owners.
+
+Component mode lists components only. The scopes between them are folded into the component
+above, so a component shows every signal, memo and effect created inside it. Owner mode
+shows every owner instead, including roots, memos and effects.
+
+Selecting a row lists its prop names, the signals it holds with their values, the scopes
+folded into it, its children, and the ancestry it was created under. Every frame of the
+ancestry is clickable, so you can walk back up the tree. Prop values are getters, so the panel lists their names
+and never reads them.
+
+A component also shows where it is declared. The location comes from the hot reload
+transform, which `@solidjs/vite-plugin` runs in development, so it is there without any
+extra setup. Clicking it asks the dev server to open the file in your editor.
+
+The panel reads the tree through the development hooks in `solid-js`, so it is empty in a
+production build of the runtime. It only watches while it is open.
+
+For more inspection tools, see [Solid Devtools](https://github.com/thetarnav/solid-devtools).
