@@ -5,7 +5,7 @@ import { ChunkReader } from '@solidjs/web/server-functions/client';
 
 import { Badge } from '../../ui/Badge.js';
 import { HexViewer } from './HexViewer.js';
-import { PropertySeparator, SerovalValue } from './SerovalValue.js';
+import { TreeBranch, TreeKey, TreeLeaf, TreeMark, ValueToken } from '../../ui/ValueTree.js';
 
 import './SerovalViewer.css';
 
@@ -478,69 +478,6 @@ function previewNode(ctx: RenderContext, node: SerovalNode, depth: number): stri
   }
 }
 
-interface EntryKeyProps {
-  value: string | number;
-  kind?: 'key' | 'number' | 'keyword';
-}
-
-function EntryKey(props: EntryKeyProps): JSX.Element {
-  return (
-    <span data-solid-seroval-tree-key>
-      <SerovalValue kind={props.kind ?? 'key'} value={props.value} />
-      <PropertySeparator />
-    </span>
-  );
-}
-
-interface LeafRowProps {
-  label?: JSX.Element;
-  children: JSX.Element;
-}
-
-function LeafRow(props: LeafRowProps): JSX.Element {
-  return (
-    <div data-solid-seroval-tree-node>
-      <div data-solid-seroval-tree-row>
-        <span data-solid-seroval-tree-chevron data-leaf="true" />
-        {props.label}
-        {props.children}
-      </div>
-    </div>
-  );
-}
-
-interface ExpandableRowProps {
-  label?: JSX.Element;
-  badges?: JSX.Element;
-  preview: JSX.Element;
-  open?: boolean;
-  children: JSX.Element;
-}
-
-function ExpandableRow(props: ExpandableRowProps): JSX.Element {
-  const [open, setOpen] = createSignal(props.open ?? false);
-  return (
-    <div data-solid-seroval-tree-node>
-      <button
-        type="button"
-        data-solid-seroval-tree-row
-        data-expanded={open() ? 'true' : undefined}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span data-solid-seroval-tree-chevron />
-        {props.label}
-        {props.badges}
-        <Show when={!open()}>
-          <span data-solid-seroval-tree-preview>{props.preview}</span>
-        </Show>
-      </button>
-      <Show when={open()}>
-        <div data-solid-seroval-tree-children>{props.children}</div>
-      </Show>
-    </div>
-  );
-}
-
 interface TreeValueProps {
   ctx: RenderContext;
   node: SerovalNode;
@@ -558,12 +495,12 @@ function TreeValue(props: TreeValueProps): JSX.Element {
     const index = node.i;
     if (props.seen.includes(index)) {
       return (
-        <LeafRow label={props.label}>
-          <span data-solid-seroval-tree-circular>
+        <TreeLeaf label={props.label}>
+          <TreeMark>
             <LinkIcon title={`Circular reference to #${index}`} />
             <Badge type="info">{`circular #${index}`}</Badge>
-          </span>
-        </LeafRow>
+          </TreeMark>
+        </TreeLeaf>
       );
     }
     return (
@@ -571,9 +508,9 @@ function TreeValue(props: TreeValueProps): JSX.Element {
         when={ctx.getNode(index)}
         keyed
         fallback={
-          <LeafRow label={props.label}>
+          <TreeLeaf label={props.label}>
             <Badge type="warning">{`#${index} pending`}</Badge>
-          </LeafRow>
+          </TreeLeaf>
         }
       >
         {(target) => (
@@ -602,58 +539,58 @@ function TreeValue(props: TreeValueProps): JSX.Element {
     // Number = 0,
     case 0:
       return (
-        <LeafRow label={props.label}>
-          <SerovalValue kind="number" value={node.s} />
-        </LeafRow>
+        <TreeLeaf label={props.label}>
+          <ValueToken kind="number" value={node.s} />
+        </TreeLeaf>
       );
     // String = 1,
     case 1:
       return (
-        <LeafRow label={props.label}>
-          <SerovalValue kind="string" value={`"${node.s}"`} />
-        </LeafRow>
+        <TreeLeaf label={props.label}>
+          <ValueToken kind="string" value={`"${node.s}"`} />
+        </TreeLeaf>
       );
     // Constant = 2,
     case 2:
       return (
-        <LeafRow label={props.label}>
-          <SerovalValue kind="keyword" value={getConstantValue(node.s)} />
-        </LeafRow>
+        <TreeLeaf label={props.label}>
+          <ValueToken kind="keyword" value={getConstantValue(node.s)} />
+        </TreeLeaf>
       );
     // BigInt = 3,
     case 3:
       return (
-        <LeafRow label={props.label}>
-          <SerovalValue kind="number" value={`${node.s}n`} />
-        </LeafRow>
+        <TreeLeaf label={props.label}>
+          <ValueToken kind="number" value={`${node.s}n`} />
+        </TreeLeaf>
       );
     // Date = 5,
     case 5:
       return (
-        <LeafRow label={props.label}>
+        <TreeLeaf label={props.label}>
           <Badge type="info">Date</Badge>
-          <SerovalValue kind="string" value={node.s} />
-        </LeafRow>
+          <ValueToken kind="string" value={node.s} />
+        </TreeLeaf>
       );
     // RegExp = 6,
     case 6:
       return (
-        <LeafRow label={props.label}>
+        <TreeLeaf label={props.label}>
           <Badge type="info">RegExp</Badge>
-          <SerovalValue kind="string" value={`/${node.c}/${node.m}`} />
-        </LeafRow>
+          <ValueToken kind="string" value={`/${node.c}/${node.m}`} />
+        </TreeLeaf>
       );
     // WKSymbol = 17,
     case 17:
       return (
-        <LeafRow label={props.label}>
-          <SerovalValue kind="keyword" value={getSymbolValue(node.s)} />
-        </LeafRow>
+        <TreeLeaf label={props.label}>
+          <ValueToken kind="keyword" value={getSymbolValue(node.s)} />
+        </TreeLeaf>
       );
     // Set = 7,
     case 7:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={previewNode(ctx, node, 0)}
@@ -665,16 +602,16 @@ function TreeValue(props: TreeValueProps): JSX.Element {
                 ctx={ctx}
                 node={child}
                 seen={seen}
-                label={<EntryKey kind="number" value={index()} />}
+                label={<TreeKey kind="number" value={index()} />}
               />
             )}
           </For>
-        </ExpandableRow>
+        </TreeBranch>
       );
     // Map = 8,
     case 8:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={previewNode(ctx, node, 0)}
@@ -682,31 +619,31 @@ function TreeValue(props: TreeValueProps): JSX.Element {
         >
           <For each={zip(node.e.k, node.e.v)}>
             {([key, value], index) => (
-              <ExpandableRow
-                label={<EntryKey kind="number" value={index()} />}
+              <TreeBranch
+                label={<TreeKey kind="number" value={index()} />}
                 preview={`{${previewNode(ctx, key, 1)} => ${previewNode(ctx, value, 1)}}`}
               >
                 <TreeValue
                   ctx={ctx}
                   node={key}
                   seen={seen}
-                  label={<EntryKey kind="keyword" value="key" />}
+                  label={<TreeKey kind="keyword" value="key" />}
                 />
                 <TreeValue
                   ctx={ctx}
                   node={value}
                   seen={seen}
-                  label={<EntryKey kind="keyword" value="value" />}
+                  label={<TreeKey kind="keyword" value="value" />}
                 />
-              </ExpandableRow>
+              </TreeBranch>
             )}
           </For>
-        </ExpandableRow>
+        </TreeBranch>
       );
     // Array = 9,
     case 9:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={previewNode(ctx, node, 0)}
@@ -715,27 +652,27 @@ function TreeValue(props: TreeValueProps): JSX.Element {
           <For each={node.a}>
             {(child, index) =>
               child === 0 ? (
-                <LeafRow label={<EntryKey kind="number" value={index()} />}>
-                  <SerovalValue kind="keyword" value="empty" />
-                </LeafRow>
+                <TreeLeaf label={<TreeKey kind="number" value={index()} />}>
+                  <ValueToken kind="keyword" value="empty" />
+                </TreeLeaf>
               ) : (
                 <TreeValue
                   ctx={ctx}
                   node={child}
                   seen={seen}
-                  label={<EntryKey kind="number" value={index()} />}
+                  label={<TreeKey kind="number" value={index()} />}
                 />
               )
             }
           </For>
-        </ExpandableRow>
+        </TreeBranch>
       );
     // Object = 10,
     case 10:
     // NullConstructor = 11,
     case 11:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={previewNode(ctx, node, 0)}
@@ -747,18 +684,16 @@ function TreeValue(props: TreeValueProps): JSX.Element {
                 ctx={ctx}
                 node={value}
                 seen={seen}
-                label={
-                  <EntryKey value={typeof key === 'string' ? key : previewNode(ctx, key, 1)} />
-                }
+                label={<TreeKey value={typeof key === 'string' ? key : previewNode(ctx, key, 1)} />}
               />
             )}
           </For>
-        </ExpandableRow>
+        </TreeBranch>
       );
     // Promise = 12,
     case 12:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={previewNode(ctx, node, 0)}
@@ -768,24 +703,24 @@ function TreeValue(props: TreeValueProps): JSX.Element {
             ctx={ctx}
             node={node.f}
             seen={seen}
-            label={<EntryKey kind="keyword" value="value" />}
+            label={<TreeKey kind="keyword" value="value" />}
           />
-        </ExpandableRow>
+        </TreeBranch>
       );
     // Error = 13,
     case 13:
     // AggregateError = 14,
     case 14:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={previewNode(ctx, node, 0)}
           open={props.open}
         >
-          <LeafRow label={<EntryKey kind="keyword" value="message" />}>
-            <SerovalValue kind="string" value={`"${node.m}"`} />
-          </LeafRow>
+          <TreeLeaf label={<TreeKey kind="keyword" value="message" />}>
+            <ValueToken kind="string" value={`"${node.m}"`} />
+          </TreeLeaf>
           <Show when={node.p}>
             {(properties) => (
               <For each={zip(properties().k, properties().v)}>
@@ -795,14 +730,14 @@ function TreeValue(props: TreeValueProps): JSX.Element {
                     node={value}
                     seen={seen}
                     label={
-                      <EntryKey value={typeof key === 'string' ? key : previewNode(ctx, key, 1)} />
+                      <TreeKey value={typeof key === 'string' ? key : previewNode(ctx, key, 1)} />
                     }
                   />
                 )}
               </For>
             )}
           </Show>
-        </ExpandableRow>
+        </TreeBranch>
       );
     // TypedArray = 15,
     case 15:
@@ -811,30 +746,30 @@ function TreeValue(props: TreeValueProps): JSX.Element {
     // DataView = 20,
     case 20:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={previewNode(ctx, node, 0)}
           open={props.open}
         >
-          <LeafRow label={<EntryKey kind="keyword" value="byteLength" />}>
-            <SerovalValue kind="number" value={node.l} />
-          </LeafRow>
-          <LeafRow label={<EntryKey kind="keyword" value="byteOffset" />}>
-            <SerovalValue kind="number" value={node.b} />
-          </LeafRow>
+          <TreeLeaf label={<TreeKey kind="keyword" value="byteLength" />}>
+            <ValueToken kind="number" value={node.l} />
+          </TreeLeaf>
+          <TreeLeaf label={<TreeKey kind="keyword" value="byteOffset" />}>
+            <ValueToken kind="number" value={node.b} />
+          </TreeLeaf>
           <TreeValue
             ctx={ctx}
             node={node.f}
             seen={seen}
-            label={<EntryKey kind="keyword" value="buffer" />}
+            label={<TreeKey kind="keyword" value="buffer" />}
           />
-        </ExpandableRow>
+        </TreeBranch>
       );
     // ArrayBuffer = 19,
     case 19:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={previewNode(ctx, node, 0)}
@@ -847,12 +782,12 @@ function TreeValue(props: TreeValueProps): JSX.Element {
               return <HexViewer bytes={result} />;
             })()}
           </div>
-        </ExpandableRow>
+        </TreeBranch>
       );
     // Boxed = 21,
     case 21:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={previewNode(ctx, node, 0)}
@@ -862,14 +797,14 @@ function TreeValue(props: TreeValueProps): JSX.Element {
             ctx={ctx}
             node={node.f}
             seen={seen}
-            label={<EntryKey kind="keyword" value="value" />}
+            label={<TreeKey kind="keyword" value="value" />}
           />
-        </ExpandableRow>
+        </TreeBranch>
       );
     // PromiseConstructor = 22,
     case 22:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={<>{previewNode(ctx, node, 0)}</>}
@@ -879,33 +814,33 @@ function TreeValue(props: TreeValueProps): JSX.Element {
             when={ctx.getPromise(node.s)}
             keyed
             fallback={
-              <LeafRow label={<EntryKey kind="keyword" value="status" />}>
+              <TreeLeaf label={<TreeKey kind="keyword" value="status" />}>
                 <Badge type="warning">pending</Badge>
-              </LeafRow>
+              </TreeLeaf>
             }
           >
             {(result) => (
               <>
-                <LeafRow label={<EntryKey kind="keyword" value="status" />}>
+                <TreeLeaf label={<TreeKey kind="keyword" value="status" />}>
                   <Badge type={result.t === 23 ? 'success' : 'failure'}>
                     {result.t === 23 ? 'success' : 'failure'}
                   </Badge>
-                </LeafRow>
+                </TreeLeaf>
                 <TreeValue
                   ctx={ctx}
                   node={result.a[1]}
                   seen={seen}
-                  label={<EntryKey kind="keyword" value="value" />}
+                  label={<TreeKey kind="keyword" value="value" />}
                 />
               </>
             )}
           </Show>
-        </ExpandableRow>
+        </TreeBranch>
       );
     // Plugin = 25,
     case 25:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={previewNode(ctx, node, 0)}
@@ -913,17 +848,17 @@ function TreeValue(props: TreeValueProps): JSX.Element {
         >
           <For each={Object.entries(node.s)}>
             {([key, value]) => (
-              <TreeValue ctx={ctx} node={value} seen={seen} label={<EntryKey value={key} />} />
+              <TreeValue ctx={ctx} node={value} seen={seen} label={<TreeKey value={key} />} />
             )}
           </For>
-        </ExpandableRow>
+        </TreeBranch>
       );
     // IteratorFactoryInstance = 28,
     case 28:
     // AsyncIteratorFactoryInstance = 30,
     case 30:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={previewNode(ctx, node, 0)}
@@ -933,14 +868,14 @@ function TreeValue(props: TreeValueProps): JSX.Element {
             ctx={ctx}
             node={node.a[1]}
             seen={seen}
-            label={<EntryKey kind="keyword" value="values" />}
+            label={<TreeKey kind="keyword" value="values" />}
           />
-        </ExpandableRow>
+        </TreeBranch>
       );
     // StreamConstructor = 31,
     case 31:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={<>{previewNode(ctx, node, 0)}</>}
@@ -949,9 +884,9 @@ function TreeValue(props: TreeValueProps): JSX.Element {
           <For
             each={ctx.getStream(node.i) || []}
             fallback={
-              <LeafRow label={<EntryKey kind="keyword" value="status" />}>
+              <TreeLeaf label={<TreeKey kind="keyword" value="status" />}>
                 <Badge type="warning">waiting</Badge>
-              </LeafRow>
+              </TreeLeaf>
             }
           >
             {(chunk) => (
@@ -959,15 +894,15 @@ function TreeValue(props: TreeValueProps): JSX.Element {
                 ctx={ctx}
                 node={chunk.f}
                 seen={seen}
-                label={<EntryKey kind="keyword" value={getStreamKeyword(chunk.t)} />}
+                label={<TreeKey kind="keyword" value={getStreamKeyword(chunk.t)} />}
               />
             )}
           </For>
-        </ExpandableRow>
+        </TreeBranch>
       );
     case 35:
       return (
-        <ExpandableRow
+        <TreeBranch
           label={props.label}
           badges={badges}
           preview={previewNode(ctx, node, 0)}
@@ -982,7 +917,7 @@ function TreeValue(props: TreeValueProps): JSX.Element {
                     node={current()}
                     seen={seen}
                     label={
-                      <EntryKey
+                      <TreeKey
                         kind="keyword"
                         value={
                           index() === node.l ? 'return' : index() === node.s ? 'throw' : 'next'
@@ -994,13 +929,13 @@ function TreeValue(props: TreeValueProps): JSX.Element {
               </Show>
             )}
           </For>
-        </ExpandableRow>
+        </TreeBranch>
       );
     default:
       return (
-        <LeafRow label={props.label}>
+        <TreeLeaf label={props.label}>
           <Badge type="warning">{getNodeType(node)}</Badge>
-        </LeafRow>
+        </TreeLeaf>
       );
   }
 }

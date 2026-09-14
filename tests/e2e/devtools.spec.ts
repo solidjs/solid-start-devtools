@@ -78,6 +78,74 @@ test('shows server-function calls', async ({ page }) => {
   expect(warnings).not.toContainEqual(expect.stringContaining('STRICT_READ_UNTRACKED'));
 });
 
+test('maps the reactivity graph', async ({ page }) => {
+  await page.goto('/');
+  const toggle = page.getByRole('button', { name: 'View Reactivity Graph' });
+  const nodes = page.locator('[data-solid-reactivity-node]');
+  const count = nodes.filter({ hasText: /^count/ }).first();
+
+  await toggle.click();
+  await expect(count).toBeVisible();
+  await expect(nodes.filter({ hasText: /^doubled/ }).first()).toBeVisible();
+  await expect(nodes.filter({ hasText: /^report-doubled/ }).first()).toBeVisible();
+
+  // Effects that subscribe to nothing sit in their own column before the signals.
+  const columns = await nodes.evaluateAll((elements) =>
+    elements.map((element) => ({
+      x: Math.round(element.getBoundingClientRect().x),
+      kind: (element as HTMLElement).dataset.kind,
+    })),
+  );
+  const leftmost = Math.min(...columns.map((entry) => entry.x));
+  expect(
+    columns
+      .filter((entry) => entry.x === leftmost)
+      .every((entry) => entry.kind?.includes('effect')),
+  ).toBe(true);
+  expect(columns.some((entry) => entry.kind === 'signal' && entry.x > leftmost)).toBe(true);
+
+  // Hovering a node explains it without selecting it.
+  await count.hover();
+  const card = page.locator('[data-solid-reactivity-hovercard]');
+  await expect(card).toContainText('number');
+  await expect(card).toContainText('2 out');
+
+  // Selecting a node lists what reads it and dims the rest of the graph.
+  await count.click();
+  const detail = page.locator('[data-solid-reactivity-detail]');
+  await expect(detail).toContainText('Observers (2)');
+  await expect(detail.locator('[data-solid-reactivity-link]').first()).toContainText('doubled');
+  await expect(nodes.filter({ hasText: /^doubled/ }).first()).toHaveAttribute(
+    'data-solid-reactivity-node',
+    'downstream',
+  );
+
+  // The panel covers the page, so close it before driving the app.
+  await toggle.click();
+  await page.locator('#increment-count').click();
+  await toggle.click();
+  await expect(count).toContainText('1');
+  await expect(nodes.filter({ hasText: /^doubled/ }).first()).toContainText('2');
+
+  // The value pane is the same expandable tree the server function viewer uses.
+  const tree = page.locator('[data-solid-reactivity-detail-value]');
+  await expect(tree.locator('[data-solid-value-token="number"]')).toHaveText('1');
+
+  await nodes
+    .filter({ hasText: /^effect\[/ })
+    .first()
+    .click();
+  await expect(tree.locator('[data-solid-value-tree-row]').first()).toContainText('array');
+  await expect(tree.locator('[data-solid-value-tree-key]').first()).toContainText('0');
+  await expect(tree).toContainText('<main>');
+
+  // Filters drop a whole kind from the graph.
+  await count.click();
+  await page.getByRole('button', { name: 'Memos' }).click();
+  await expect(nodes.filter({ hasText: /^doubled/ })).toHaveCount(0);
+  await expect(count).toBeVisible();
+});
+
 test('mounts once and disposes', async ({ page }) => {
   await page.goto('/?mount');
 

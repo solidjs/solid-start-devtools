@@ -23,6 +23,7 @@
   },
   "scripts": {
     "build": "rolldown -c",
+    "demo": "pnpm build && vite --config examples/demo/vite.config.ts",
     "check": "publint && attw --pack . --profile esm-only",
     "format": "oxfmt --write",
     "format:check": "oxfmt --check",
@@ -59,6 +60,7 @@
     "@dom-expressions/compiler": "^0.50.0-next.43",
     "@jridgewell/trace-mapping": "^0.3.31",
     "@playwright/test": "^1.62.1",
+    "@solidjs/vite-plugin": "3.0.0-next.35",
     "@solidjs/web": "^2.0.0-rc.0",
     "@types/node": "^24.0.0",
     "error-stack-parser-es": "^2.0.1",

@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["playwright.config.ts", "vitest.config.ts", "src/**/*.test.ts", "tests"],
+  "include": ["playwright.config.ts", "vitest.config.ts", "src/**/*.test.ts", "tests", "examples"],
   "exclude": [],
   "compilerOptions": {
     "noEmit": true,
