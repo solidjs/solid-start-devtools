@@ -165,6 +165,9 @@
   height: 1rem;
   flex-shrink: 0;
 
+  /* The browser pads buttons, which leaves the arrow no room in a 1rem box. */
+  padding: 0;
+
   border: none;
   background: none;
   color: var(--start-dt-text-muted);
@@ -174,8 +177,10 @@
 [data-solid-ownership-chevron]::before {
   content: '';
 
+  box-sizing: content-box;
   width: 0.3125rem;
   height: 0.3125rem;
+  flex-shrink: 0;
 
   border-right: 1.5px currentColor solid;
   border-bottom: 1.5px currentColor solid;
@@ -371,8 +376,15 @@
   background: var(--start-dt-accent-soft);
 }
 
+/* The selected owner's own action sits in the heading, so it is always shown. */
+[data-solid-ownership-detail-head] [data-solid-ownership-view-graph] {
+  margin-left: auto;
+  opacity: 1;
+}
+
 /* The toolbar sizes every svg as a large icon. Row actions need a small one. */
-[data-solid-ownership-signal] [data-solid-ownership-view-graph] svg {
+[data-solid-ownership-signal] [data-solid-ownership-view-graph] svg,
+[data-solid-ownership-detail-head] [data-solid-ownership-view-graph] svg {
   width: 0.875rem;
   height: 0.875rem;
 }

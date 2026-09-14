@@ -177,6 +177,16 @@ test('maps the ownership tree', async ({ page }) => {
   await toggle.click();
   await expect(rows).toHaveText(['<App>', '<Greeting>', '<Counter>', '<Show>']);
 
+  // The expand arrow keeps its full size inside the button.
+  const arrow = await page
+    .locator('[data-solid-ownership-chevron]')
+    .first()
+    .evaluate((element) => {
+      const style = getComputedStyle(element, '::before');
+      return [style.width, style.height];
+    });
+  expect(arrow).toEqual(['5px', '5px']);
+
   // The detail pane only appears once an owner is selected.
   await expect(page.locator('[data-solid-ownership-detail]')).toHaveCount(0);
 
@@ -261,6 +271,24 @@ test('maps the ownership tree', async ({ page }) => {
       .filter({ hasText: /^count/ })
       .first(),
   ).toContainText('2');
+
+  // In owner mode a memo is a row of its own, and its heading links to the graph.
+  await toggle.click();
+  await page.getByRole('button', { name: 'Owners', exact: true }).click();
+  await page
+    .locator('[data-solid-ownership-label]')
+    .filter({ hasText: /^doubled$/ })
+    .click();
+  await detail
+    .locator('[data-solid-ownership-detail-head]')
+    .getByRole('button', { name: 'View in graph' })
+    .click();
+  await expect(
+    page
+      .locator('[data-solid-reactivity-node]')
+      .filter({ hasText: /^doubled/ })
+      .first(),
+  ).toHaveAttribute('data-solid-reactivity-node', 'selected');
 });
 
 test('mounts once and disposes', async ({ page }) => {

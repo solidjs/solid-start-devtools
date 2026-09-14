@@ -14,8 +14,19 @@ import {
   startOwnershipTracking,
   subscribeOwnershipTree,
 } from './registry.js';
-import { ancestorsOf, EMPTY_TREE, type OwnershipTree, type TreeNode } from './tree.js';
+import {
+  ancestorsOf,
+  EMPTY_TREE,
+  type OwnerKind,
+  type OwnershipTree,
+  type TreeNode,
+} from './tree.js';
 import './styles.css';
+
+/** Owners the reactivity graph draws. Components, roots and plain scopes hold no value. */
+function isInGraph(kind: OwnerKind): boolean {
+  return kind !== 'component' && kind !== 'root' && kind !== 'scope';
+}
 
 /**
  * Asks the dev server to open the file. Vite serves this endpoint in
@@ -337,6 +348,16 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                           {node().name}
                         </Text>
                         <Badge type="info">{node().kind}</Badge>
+                        <Show when={props.onViewInGraph && isInGraph(node().kind)}>
+                          <button
+                            type="button"
+                            data-solid-ownership-view-graph
+                            aria-label="View in graph"
+                            onClick={() => props.onViewInGraph?.(node().owner)}
+                          >
+                            <EyeIcon title="View in graph" />
+                          </button>
+                        </Show>
                       </div>
 
                       <Show when={node().location}>
@@ -468,13 +489,7 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                                   >
                                     {scope.hasValue ? previewValue(scope.value) : scope.kind}
                                   </Text>
-                                  <Show
-                                    when={
-                                      props.onViewInGraph &&
-                                      scope.kind !== 'scope' &&
-                                      scope.kind !== 'root'
-                                    }
-                                  >
+                                  <Show when={props.onViewInGraph && isInGraph(scope.kind)}>
                                     <button
                                       type="button"
                                       data-solid-ownership-view-graph

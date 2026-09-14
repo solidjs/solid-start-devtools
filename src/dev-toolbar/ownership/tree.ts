@@ -73,6 +73,8 @@ export interface TreeNode {
   scopes: FoldedScope[];
   /** Where the component is declared, as `file:line:column`. */
   location: string | undefined;
+  /** The runtime owner, so another panel can find the same memo or effect. */
+  owner: RawNode;
 }
 
 export interface OwnershipTree {
@@ -204,6 +206,7 @@ export function buildOwnershipTree(roots: RawNode[], options: BuildOptions): Own
       time: timeOf(owner),
       disposed: isDisposed(owner),
       scopes: [],
+      owner,
     };
     nodes.push(node);
     if (parentId === undefined) topLevel.push(node.id);
