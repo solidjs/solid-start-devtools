@@ -331,7 +331,7 @@
 
 [data-solid-ownership-signal] {
   display: grid;
-  grid-template-columns: minmax(4rem, 40%) 1fr;
+  grid-template-columns: minmax(4rem, 40%) 1fr auto;
   align-items: baseline;
 
   gap: 0.5rem;
@@ -343,6 +343,28 @@
 
 [data-solid-ownership-signal]:hover {
   background: var(--start-dt-surface-hover);
+}
+
+/* The action stays out of the way until the row is pointed at or focused. */
+[data-solid-ownership-view-graph] {
+  padding: 0 0.375rem;
+
+  border: none;
+  border-radius: 0.25rem;
+  background: none;
+  color: var(--start-dt-accent);
+
+  cursor: pointer;
+  opacity: 0;
+}
+
+[data-solid-ownership-signal]:hover [data-solid-ownership-view-graph],
+[data-solid-ownership-view-graph]:focus-visible {
+  opacity: 1;
+}
+
+[data-solid-ownership-view-graph]:hover {
+  background: var(--start-dt-accent-soft);
 }
 
 [data-solid-ownership-scope-name] {

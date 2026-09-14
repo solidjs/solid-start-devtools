@@ -30,6 +30,8 @@ export interface OwnedSignal {
   id: string;
   name: string;
   value: unknown;
+  /** The runtime node, so another panel can find the same signal. */
+  node: RawNode;
 }
 
 /** A scope folded into the component above it, such as a memo or an effect. */
@@ -39,6 +41,8 @@ export interface FoldedScope {
   name: string;
   value: unknown;
   hasValue: boolean;
+  /** The runtime owner, so another panel can find the same memo or effect. */
+  node: RawNode;
 }
 
 export interface TreeNode {
@@ -202,6 +206,7 @@ export function buildOwnershipTree(roots: RawNode[], options: BuildOptions): Own
         id: options.identify(signal),
         name: typeof name === 'string' && name.length > 0 ? name : 'signal',
         value: signal._value,
+        node: signal,
       });
     }
   }
@@ -245,6 +250,7 @@ export function buildOwnershipTree(roots: RawNode[], options: BuildOptions): Own
         name: ownerName(owner, kind),
         value: '_value' in owner ? owner._value : undefined,
         hasValue: '_value' in owner,
+        node: owner,
       });
       collectSignals(owner, host);
     }

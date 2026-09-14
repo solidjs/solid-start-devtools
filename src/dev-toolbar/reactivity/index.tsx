@@ -11,6 +11,7 @@ import { ValueInspector } from './ValueInspector.js';
 import {
   EMPTY_GRAPH,
   excludeReactiveOwner,
+  reactiveNodeId,
   isReactivityAvailable,
   snapshotReactivityGraph,
   startReactivityTracking,
@@ -88,6 +89,11 @@ function NodeSummary(props: { node: ReactiveNode }): JSX.Element {
 
 export interface ReactivityViewerProps {
   show?: boolean;
+  /**
+   * A node another panel asked to show. Pass a new object for every request,
+   * so asking for the same node twice still moves the view.
+   */
+  focus?: { node: object };
 }
 
 export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Element {
@@ -106,6 +112,8 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
   let viewport: HTMLDivElement | undefined;
   let fittedSize = '';
   let moved = false;
+  let appliedFocus: { node: object } | undefined;
+  let pendingCenter: string | undefined;
 
   function refresh(): void {
     const next = snapshotReactivityGraph();
@@ -242,11 +250,49 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
     });
   }
 
+  /** Moves the view so a node sits in the middle. False when the canvas is not there yet. */
+  function centerOn(position: { x: number; y: number }): boolean {
+    const box = viewport?.getBoundingClientRect();
+    if (!box || box.width === 0) return false;
+    moved = true;
+    setView((current) => ({
+      k: current.k,
+      x: box.width / 2 - (position.x + NODE_WIDTH / 2) * current.k,
+      y: box.height / 2 - (position.y + NODE_HEIGHT / 2) * current.k,
+    }));
+    return true;
+  }
+
+  // Another panel can ask for a node. Filters that would hide it are cleared,
+  // and the request waits for a snapshot that contains the node.
+  createEffect(
+    () => ({ request: props.focus, nodes: graph().nodes, visible: !!props.show }),
+    ({ request, nodes, visible }) => {
+      if (!request || !visible || request === appliedFocus) return;
+      const id = reactiveNodeId(request.node);
+      const target = nodes.find((node) => node.id === id);
+      if (!target) return;
+      appliedFocus = request;
+      setQuery('');
+      setHiddenKinds((current) => current.filter((kind) => kind !== target.kind));
+      setSelected(id);
+      const position = lastLayout?.nodes.get(id);
+      if (!position || !centerOn(position)) pendingCenter = id;
+    },
+  );
+
   // Refit while the graph grows. Once the user pans or zooms, the view is
   // theirs and only the fit button moves it.
   createEffect(
     () => layout(),
     (current) => {
+      if (pendingCenter) {
+        const position = current.nodes.get(pendingCenter);
+        if (position && centerOn(position)) {
+          pendingCenter = undefined;
+          return;
+        }
+      }
       const size = `${current.width}x${current.height}`;
       if (moved || current.width === 0 || size === fittedSize) return;
       fittedSize = size;

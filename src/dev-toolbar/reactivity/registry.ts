@@ -119,6 +119,11 @@ function idOf(node: RawNode): string {
   return id;
 }
 
+/** The graph's id for a runtime node, so another panel can point the graph at it. */
+export function reactiveNodeId(node: object): string {
+  return idOf(node as RawNode);
+}
+
 function track(node: RawNode | null | undefined): void {
   if (!node || typeof node !== 'object' || trackedRefs.has(node)) return;
   const ref = new WeakRef(node);

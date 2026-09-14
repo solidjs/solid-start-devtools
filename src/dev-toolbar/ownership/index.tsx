@@ -37,6 +37,8 @@ interface Row {
 
 export interface OwnershipViewerProps {
   show?: boolean;
+  /** Opens a signal, memo or effect in the reactivity graph. */
+  onViewInGraph?: (node: object) => void;
 }
 
 export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Element {
@@ -280,12 +282,6 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                           >
                             {row.node.name}
                           </Text>
-                          <Show when={row.node.signals.length > 0}>
-                            <Badge type="info">{`${row.node.signals.length} signals`}</Badge>
-                          </Show>
-                          <Show when={row.node.scopes.length > 0}>
-                            <Badge type="info">{`${row.node.scopes.length} scopes`}</Badge>
-                          </Show>
                           <Show when={row.node.disposed}>
                             <Badge type="failure">disposed</Badge>
                           </Show>
@@ -400,6 +396,19 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                                 >
                                   {previewValue(signal.value)}
                                 </Text>
+                                <Show when={props.onViewInGraph}>
+                                  <button
+                                    type="button"
+                                    data-solid-ownership-view-graph
+                                    onClick={() => props.onViewInGraph?.(signal.node)}
+                                  >
+                                    <Text
+                                      options={{ size: 'xs', weight: 'semibold', wrap: 'nowrap' }}
+                                    >
+                                      View in graph
+                                    </Text>
+                                  </button>
+                                </Show>
                               </div>
                             )}
                           </For>
@@ -434,6 +443,25 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                                   >
                                     {scope.hasValue ? previewValue(scope.value) : scope.kind}
                                   </Text>
+                                  <Show
+                                    when={
+                                      props.onViewInGraph &&
+                                      scope.kind !== 'scope' &&
+                                      scope.kind !== 'root'
+                                    }
+                                  >
+                                    <button
+                                      type="button"
+                                      data-solid-ownership-view-graph
+                                      onClick={() => props.onViewInGraph?.(scope.node)}
+                                    >
+                                      <Text
+                                        options={{ size: 'xs', weight: 'semibold', wrap: 'nowrap' }}
+                                      >
+                                        View in graph
+                                      </Text>
+                                    </button>
+                                  </Show>
                                 </div>
                               )}
                             </For>

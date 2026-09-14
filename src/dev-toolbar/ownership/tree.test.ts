@@ -108,7 +108,14 @@ describe('buildOwnershipTree in component mode', () => {
 
     expect(names(tree.nodes)).toEqual(['<App>', '<Child>']);
     expect(tree.nodes[0]!.scopes).toEqual([
-      { id: expect.any(String), kind: 'memo', name: 'total', value: 7, hasValue: true },
+      {
+        id: expect.any(String),
+        kind: 'memo',
+        name: 'total',
+        value: 7,
+        hasValue: true,
+        node: memo,
+      },
     ]);
     expect(tree.nodes[0]!.children).toEqual([tree.nodes[1]!.id]);
   });
@@ -131,6 +138,17 @@ describe('buildOwnershipTree in component mode', () => {
 
   it('has no location for a component compiled without the transform', () => {
     expect(build([owner({ component: 'App' })]).nodes[0]!.location).toBeUndefined();
+  });
+
+  it('keeps the runtime nodes so another panel can find them', () => {
+    const inner = signal('inner', 1);
+    const scope = owner({ memo: true, name: 'derived', signals: [inner] });
+    const root = owner({ component: 'App', children: [scope] });
+
+    const tree = build([root]);
+
+    expect(tree.nodes[0]!.signals[0]!.node).toBe(inner);
+    expect(tree.nodes[0]!.scopes[0]!.node).toBe(scope);
   });
 
   it('lists prop names of a component', () => {

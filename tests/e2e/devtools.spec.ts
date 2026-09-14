@@ -184,6 +184,24 @@ test('maps the ownership tree', async ({ page }) => {
   await page.getByRole('button', { name: 'Components', exact: true }).click();
   await page.locator('[data-solid-ownership-search]').fill('doubled');
   await expect(rows).toHaveText(['<App>', '<Counter>']);
+
+  // Rows carry no count badges.
+  await expect(page.locator('[data-solid-ownership-row] [data-solid-badge="info"]')).toHaveCount(0);
+
+  // A signal opens in the reactivity graph with that node selected.
+  await page.locator('[data-solid-ownership-search]').fill('');
+  await page.locator('[data-solid-ownership-label]').filter({ hasText: '<Counter>' }).click();
+  const countEntry = detail
+    .locator('[data-solid-ownership-signal]')
+    .filter({ has: page.getByText('count', { exact: true }) });
+  await countEntry.hover();
+  await countEntry.getByRole('button', { name: 'View in graph' }).click();
+  await expect(
+    page
+      .locator('[data-solid-reactivity-node]')
+      .filter({ hasText: /^count/ })
+      .first(),
+  ).toHaveAttribute('data-solid-reactivity-node', 'selected');
 });
 
 test('mounts once and disposes', async ({ page }) => {

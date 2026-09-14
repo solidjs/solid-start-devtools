@@ -145,6 +145,10 @@ export function DevToolbar(props: DevToolbarProps) {
 
   const [content, setContent] = createSignal<'fn' | 'err' | 'rx' | 'own' | undefined>(undefined);
 
+  // A panel can ask the graph to show a node. Each request is a new object, so
+  // asking for the same node twice still moves the view.
+  const [graphFocus, setGraphFocus] = createSignal<{ node: object }>();
+
   function toggleContent(value: 'fn' | 'err' | 'rx' | 'own') {
     if (content() === value) {
       setContent(undefined);
@@ -234,8 +238,14 @@ export function DevToolbar(props: DevToolbarProps) {
             </div>
           </Toolbar>
           <ErrorViewer show={content() === 'err'} errors={errors()} resetError={resetError} />
-          <ReactivityViewer show={content() === 'rx'} />
-          <OwnershipViewer show={content() === 'own'} />
+          <ReactivityViewer show={content() === 'rx'} focus={graphFocus()} />
+          <OwnershipViewer
+            show={content() === 'own'}
+            onViewInGraph={(node) => {
+              setGraphFocus({ node });
+              setContent('rx');
+            }}
+          />
           <ServerFunctionViewer
             show={content() === 'fn'}
             instances={instances()}
