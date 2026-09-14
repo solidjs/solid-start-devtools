@@ -120,7 +120,7 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
   let fittedSize = '';
   let moved = false;
   let appliedFocus: { node: object } | undefined;
-  let pendingCenter: string | undefined;
+  let centerFrame: number | undefined;
 
   function refresh(): void {
     const next = snapshotReactivityGraph();
@@ -270,6 +270,21 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
     return true;
   }
 
+  /**
+   * Centers a node on the next frame. Selecting a node mounts the detail pane,
+   * which narrows the canvas, so measuring right away would center against the
+   * old width. A few frames are allowed for the layout to include the node.
+   */
+  function centerSoon(id: string, attempts = 5): void {
+    if (centerFrame !== undefined) cancelAnimationFrame(centerFrame);
+    centerFrame = requestAnimationFrame(() => {
+      centerFrame = undefined;
+      const position = lastLayout?.nodes.get(id);
+      if (position && centerOn(position)) return;
+      if (attempts > 1) centerSoon(id, attempts - 1);
+    });
+  }
+
   // Another panel can ask for a node. Filters that would hide it are cleared,
   // and the request waits for a snapshot that contains the node.
   createEffect(
@@ -283,8 +298,9 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
       setQuery('');
       setHiddenKinds((current) => current.filter((kind) => kind !== target.kind));
       setSelected(id);
-      const position = lastLayout?.nodes.get(id);
-      if (!position || !centerOn(position)) pendingCenter = id;
+      // Keeps the auto fit from taking the view back before the frame runs.
+      moved = true;
+      centerSoon(id);
     },
   );
 
@@ -293,13 +309,6 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
   createEffect(
     () => layout(),
     (current) => {
-      if (pendingCenter) {
-        const position = current.nodes.get(pendingCenter);
-        if (position && centerOn(position)) {
-          pendingCenter = undefined;
-          return;
-        }
-      }
       const size = `${current.width}x${current.height}`;
       if (moved || current.width === 0 || size === fittedSize) return;
       fittedSize = size;
@@ -597,18 +606,9 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
                 </Show>
               </div>
 
-              <aside data-solid-reactivity-detail>
-                <Show
-                  when={selectedNode()}
-                  fallback={
-                    <Placeholder>
-                      <Text options={{ size: 'xs' }}>
-                        Select a node to inspect its value and dependencies.
-                      </Text>
-                    </Placeholder>
-                  }
-                >
-                  {(node) => (
+              <Show when={selectedNode()}>
+                {(node) => (
+                  <aside data-solid-reactivity-detail>
                     <div data-solid-reactivity-detail-content>
                       <NodeSummary node={node()} />
                       <div data-solid-reactivity-detail-block>
@@ -683,9 +683,9 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
                         </div>
                       </div>
                     </div>
-                  )}
-                </Show>
-              </aside>
+                  </aside>
+                )}
+              </Show>
             </Show>
           </div>
         </div>

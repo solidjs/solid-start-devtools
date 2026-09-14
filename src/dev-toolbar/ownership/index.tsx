@@ -4,7 +4,7 @@ import { Badge } from '../../ui/Badge.js';
 import IconButton from '../../ui/IconButton.js';
 import Placeholder from '../../ui/Placeholder.js';
 import { Text } from '../../ui/Text.js';
-import { CollapseIcon, ExpandIcon, PauseIcon, PlayIcon, TreeIcon } from '../icons.js';
+import { CollapseIcon, ExpandIcon, EyeIcon, PauseIcon, PlayIcon, TreeIcon } from '../icons.js';
 import { previewValue, typeName } from './format.js';
 import {
   excludeOwner,
@@ -292,16 +292,9 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                 </Show>
               </div>
 
-              <aside data-solid-ownership-detail>
-                <Show
-                  when={selectedNode()}
-                  fallback={
-                    <Placeholder>
-                      <Text options={{ size: 'xs' }}>Select an owner to see what it holds.</Text>
-                    </Placeholder>
-                  }
-                >
-                  {(node) => (
+              <Show when={selectedNode()}>
+                {(node) => (
+                  <aside data-solid-ownership-detail>
                     <div data-solid-ownership-detail-content>
                       <div data-solid-ownership-detail-head>
                         <span data-solid-ownership-kind={node().kind} />
@@ -400,13 +393,10 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                                   <button
                                     type="button"
                                     data-solid-ownership-view-graph
+                                    aria-label="View in graph"
                                     onClick={() => props.onViewInGraph?.(signal.node)}
                                   >
-                                    <Text
-                                      options={{ size: 'xs', weight: 'semibold', wrap: 'nowrap' }}
-                                    >
-                                      View in graph
-                                    </Text>
+                                    <EyeIcon title="View in graph" />
                                   </button>
                                 </Show>
                               </div>
@@ -453,13 +443,10 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                                     <button
                                       type="button"
                                       data-solid-ownership-view-graph
+                                      aria-label="View in graph"
                                       onClick={() => props.onViewInGraph?.(scope.node)}
                                     >
-                                      <Text
-                                        options={{ size: 'xs', weight: 'semibold', wrap: 'nowrap' }}
-                                      >
-                                        View in graph
-                                      </Text>
+                                      <EyeIcon title="View in graph" />
                                     </button>
                                   </Show>
                                 </div>
@@ -542,9 +529,9 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                         </Text>
                       </div>
                     </div>
-                  )}
-                </Show>
-              </aside>
+                  </aside>
+                )}
+              </Show>
             </Show>
           </div>
         </div>

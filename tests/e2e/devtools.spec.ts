@@ -117,6 +117,9 @@ test('maps the reactivity graph', async ({ page }) => {
     true,
   );
 
+  // The detail pane only appears once a node is selected.
+  await expect(page.locator('[data-solid-reactivity-detail]')).toHaveCount(0);
+
   // Selecting a node lists what reads it and dims the rest of the graph.
   await count.click();
   const detail = page.locator('[data-solid-reactivity-detail]');
@@ -160,6 +163,9 @@ test('maps the ownership tree', async ({ page }) => {
 
   await toggle.click();
   await expect(rows).toHaveText(['<App>', '<Greeting>', '<Counter>', '<Show>']);
+
+  // The detail pane only appears once an owner is selected.
+  await expect(page.locator('[data-solid-ownership-detail]')).toHaveCount(0);
 
   // A component owns the signals and scopes created inside it.
   await page.locator('[data-solid-ownership-label]').filter({ hasText: '<Counter>' }).click();
@@ -209,6 +215,19 @@ test('maps the ownership tree', async ({ page }) => {
       .filter({ hasText: /^count/ })
       .first(),
   ).toHaveAttribute('data-solid-reactivity-node', 'selected');
+
+  // The node lands in the middle of the canvas, measured after the detail pane
+  // has narrowed it.
+  await expect
+    .poll(async () => {
+      const canvasBox = (await page.locator('[data-solid-reactivity-canvas]').boundingBox())!;
+      const nodeBox = (await page
+        .locator('[data-solid-reactivity-node="selected"]')
+        .first()
+        .boundingBox())!;
+      return Math.abs(nodeBox.x + nodeBox.width / 2 - (canvasBox.x + canvasBox.width / 2));
+    })
+    .toBeLessThan(4);
 });
 
 test('mounts once and disposes', async ({ page }) => {
