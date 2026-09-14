@@ -1,0 +1,240 @@
+:root {
+  color-scheme: dark;
+
+  --bg: oklch(0.18 0.02 265);
+  --surface: oklch(0.23 0.02 265);
+  --surface-hover: oklch(0.27 0.025 265);
+  --border: oklch(0.32 0.02 265);
+  --text: oklch(0.94 0.005 265);
+  --muted: oklch(0.72 0.015 265);
+  --accent: oklch(0.68 0.13 245);
+  --good: oklch(0.72 0.15 150);
+  --warn: oklch(0.8 0.13 80);
+  --bad: oklch(0.66 0.19 25);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+.page {
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 8rem;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.subtitle {
+  margin: 0.375rem 0 0;
+  color: var(--muted);
+  max-width: 40rem;
+}
+
+.masthead-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+button {
+  padding: 0.4375rem 0.875rem;
+
+  border-radius: 0.5rem;
+  border: var(--border) 1px solid;
+  background: var(--surface);
+  color: var(--text);
+
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--surface-hover);
+}
+
+button.primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: oklch(0.16 0.02 265);
+  font-weight: 600;
+}
+
+button.link {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent);
+  padding: 0.25rem 0.5rem;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+
+  padding: 0.875rem 1rem;
+
+  border-radius: 0.75rem;
+  border: var(--border) 1px solid;
+  background: var(--surface);
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value.pending {
+  color: var(--muted);
+  font-size: 1.25rem;
+}
+
+.stat-note {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+input[type='search'],
+select {
+  padding: 0.4375rem 0.625rem;
+
+  border-radius: 0.5rem;
+  border: var(--border) 1px solid;
+  background: var(--surface);
+  color: var(--text);
+
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+input[type='search'] {
+  flex: 1;
+  min-width: 14rem;
+}
+
+.chips {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.chip {
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  text-transform: capitalize;
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.orders {
+  width: 100%;
+  border-collapse: collapse;
+
+  border-radius: 0.75rem;
+  border: var(--border) 1px solid;
+  overflow: hidden;
+}
+
+.orders th,
+.orders td {
+  padding: 0.625rem 0.875rem;
+  text-align: left;
+  border-bottom: var(--border) 1px solid;
+  font-size: 0.875rem;
+}
+
+.orders th {
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.orders tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.right {
+  text-align: right;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 2rem;
+}
+
+.status {
+  padding: 0.125rem 0.5rem;
+
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-paid {
+  background: color-mix(in oklch, var(--good) 20%, transparent);
+  color: var(--good);
+}
+
+.status-open {
+  background: color-mix(in oklch, var(--warn) 20%, transparent);
+  color: var(--warn);
+}
+
+.status-refunded {
+  background: color-mix(in oklch, var(--bad) 20%, transparent);
+  color: var(--bad);
+}

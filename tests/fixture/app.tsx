@@ -1,6 +1,6 @@
 import { render } from '@solidjs/web';
 import { DevToolbar, mountDevToolbar, pushServerFunctionCall } from '@solidjs/start-devtools';
-import { createMemo, createSignal, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, Show } from 'solid-js';
 
 function Broken(): never {
   throw new Error('client boom');
@@ -39,6 +39,14 @@ function Greeting(props: { name: string }) {
 function Counter() {
   const [count, setCount] = createSignal(0, { name: 'count' });
   const doubled = createMemo(() => count() * 2, { name: 'doubled' });
+
+  createEffect(
+    () => doubled(),
+    (value) => {
+      Reflect.set(window, '__doubled', value);
+    },
+    { name: 'report-doubled' },
+  );
 
   return (
     <button id="increment-count" onClick={() => setCount((value) => value + 1)}>

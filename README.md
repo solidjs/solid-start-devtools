@@ -6,6 +6,7 @@ Development error and server-function tooling for Solid Start mode.
 
 - Runtime error inspection with source-mapped stack frames.
 - Server-function request and response inspection.
+- A reactivity graph of the live signals, memos and effects in the app.
 - An ownership tree of the components and scopes the app created.
 
 ```sh
@@ -31,11 +32,25 @@ The same import is safe in development and production entries.
 
 ## Demo
 
-`examples/explorer` is a file explorer whose component tree grows as you open folders.
+Two demo apps live in `examples`.
+
+- `examples/demo` is a small orders dashboard that exercises every panel.
+- `examples/explorer` is a file explorer whose component tree grows as you open folders.
 
 ```sh
 pnpm demo
+pnpm demo:explorer
 ```
+
+## Reactivity graph
+
+The graph panel maps the running reactive graph. Signals, memos and effects are nodes,
+and an edge points from a source to the computation that reads it. Hover a node for its
+value, state and edge counts. Select one to dim the rest of the graph, list what it
+reads and what reads it, and inspect its value as an expandable tree.
+
+The panel reads the graph through the development hooks in `solid-js`, so it is empty in a
+production build of the runtime. It only watches while it is open.
 
 ## Ownership tree
 
@@ -57,4 +72,4 @@ extra setup. Clicking it asks the dev server to open the file in your editor.
 The panel reads the tree through the development hooks in `solid-js`, so it is empty in a
 production build of the runtime. It only watches while it is open.
 
-For reactivity inspection, see [Solid Devtools](https://github.com/thetarnav/solid-devtools).
+For more inspection tools, see [Solid Devtools](https://github.com/thetarnav/solid-devtools).

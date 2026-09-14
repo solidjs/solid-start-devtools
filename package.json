@@ -23,7 +23,8 @@
   },
   "scripts": {
     "build": "rolldown -c",
-    "demo": "pnpm build && vite --config examples/explorer/vite.config.ts",
+    "demo": "pnpm build && vite --config examples/demo/vite.config.ts",
+    "demo:explorer": "pnpm build && vite --config examples/explorer/vite.config.ts",
     "check": "publint && attw --pack . --profile esm-only",
     "format": "oxfmt --write",
     "format:check": "oxfmt --check",

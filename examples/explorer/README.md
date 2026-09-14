@@ -3,7 +3,7 @@
 A file explorer that grows and shrinks its component tree as you use it.
 
 ```sh
-pnpm demo
+pnpm demo:explorer
 ```
 
 The command builds the package and starts the app on http://localhost:5173.
