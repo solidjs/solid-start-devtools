@@ -1,0 +1,508 @@
+[data-solid-ownership-viewer] {
+  --start-dt-kind-component: oklch(0.68 0.13 245);
+  --start-dt-kind-root: oklch(0.72 0.12 195);
+  --start-dt-kind-memo: oklch(0.7 0.14 300);
+  --start-dt-kind-effect: oklch(0.72 0.15 150);
+  --start-dt-kind-render-effect: oklch(0.78 0.13 80);
+  --start-dt-kind-tracked-effect: oklch(0.72 0.12 210);
+  --start-dt-kind-scope: oklch(0.6 0.02 265);
+
+  color: var(--start-dt-text);
+
+  display: flex;
+  flex-direction: column;
+
+  height: 100%;
+  min-height: 0;
+}
+
+[data-solid-ownership-nav] {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+
+  gap: 0.5rem;
+
+  padding: 0.5rem 0.75rem;
+
+  border-bottom: var(--start-dt-border-soft) 1px solid;
+}
+
+[data-solid-ownership-nav-title] {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+
+  gap: 0.5rem;
+
+  flex-shrink: 0;
+}
+
+[data-solid-ownership-nav-actions] {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+
+  gap: 0.375rem;
+
+  margin-left: auto;
+}
+
+[data-solid-ownership-count] {
+  color: var(--start-dt-text-muted);
+  white-space: nowrap;
+}
+
+[data-solid-ownership-search] {
+  flex: 1;
+  min-width: 6rem;
+  max-width: 18rem;
+
+  padding: 0.25rem 0.5rem;
+
+  border-radius: 0.5rem;
+  border: var(--start-dt-border) 1px solid;
+  background: var(--start-dt-surface);
+  color: var(--start-dt-text);
+
+  font-family: inherit;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+[data-solid-ownership-search]:focus {
+  outline: none;
+  border-color: var(--start-dt-accent);
+}
+
+[data-solid-ownership-modes] {
+  display: flex;
+
+  border-radius: 9999px;
+  border: var(--start-dt-border) 1px solid;
+  overflow: hidden;
+}
+
+[data-solid-ownership-mode] {
+  padding: 0.1875rem 0.625rem;
+
+  border: none;
+  background: var(--start-dt-surface);
+  color: var(--start-dt-text-muted);
+
+  cursor: pointer;
+}
+
+[data-solid-ownership-mode]:hover {
+  background: var(--start-dt-surface-hover);
+}
+
+[data-solid-ownership-mode][data-active] {
+  background: var(--start-dt-accent-soft);
+  color: var(--start-dt-accent);
+}
+
+[data-solid-ownership-body] {
+  display: flex;
+  flex-direction: row;
+
+  flex: 1;
+  min-height: 0;
+}
+
+[data-solid-ownership-rows] {
+  display: flex;
+  flex-direction: column;
+
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+
+  padding: 0.375rem 0.25rem;
+
+  overflow: auto;
+}
+
+[data-solid-ownership-row] {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+
+  gap: 0.125rem;
+
+  border-radius: 0.375rem;
+
+  min-width: 0;
+}
+
+[data-solid-ownership-row]:hover {
+  background: var(--start-dt-surface-hover);
+}
+
+[data-solid-ownership-row][data-selected] {
+  background: var(--start-dt-surface-active);
+}
+
+[data-solid-ownership-row][data-fresh] {
+  animation: solid-ownership-pulse 900ms ease-out;
+}
+
+@keyframes solid-ownership-pulse {
+  0% {
+    background: var(--start-dt-accent-soft);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+[data-solid-ownership-chevron] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+
+  /* The browser pads buttons, which leaves the arrow no room in a 1rem box. */
+  padding: 0;
+
+  border: none;
+  background: none;
+  color: var(--start-dt-text-muted);
+  cursor: pointer;
+}
+
+[data-solid-ownership-chevron]::before {
+  content: '';
+
+  box-sizing: content-box;
+  width: 0.3125rem;
+  height: 0.3125rem;
+  flex-shrink: 0;
+
+  border-right: 1.5px currentColor solid;
+  border-bottom: 1.5px currentColor solid;
+
+  transform: rotate(-45deg);
+  transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-solid-ownership-chevron][data-leaf] {
+  cursor: default;
+}
+
+[data-solid-ownership-chevron][data-leaf]::before {
+  content: none;
+}
+
+[data-solid-ownership-chevron][data-expanded]::before {
+  transform: rotate(45deg);
+}
+
+[data-solid-ownership-label] {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+
+  gap: 0.375rem;
+
+  flex: 1;
+  min-width: 0;
+
+  padding: 0.1875rem 0.25rem;
+
+  border: none;
+  background: none;
+  color: inherit;
+
+  text-align: left;
+  cursor: pointer;
+}
+
+[data-solid-ownership-name] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-solid-ownership-kind] {
+  width: 0.5rem;
+  height: 0.5rem;
+
+  flex-shrink: 0;
+
+  border-radius: 9999px;
+  background: var(--start-dt-kind-scope);
+}
+
+[data-solid-ownership-kind='component'] {
+  background: var(--start-dt-kind-component);
+}
+
+[data-solid-ownership-kind='root'] {
+  background: var(--start-dt-kind-root);
+}
+
+[data-solid-ownership-kind='memo'] {
+  background: var(--start-dt-kind-memo);
+}
+
+[data-solid-ownership-kind='effect'] {
+  background: var(--start-dt-kind-effect);
+}
+
+[data-solid-ownership-kind='render-effect'] {
+  background: var(--start-dt-kind-render-effect);
+}
+
+[data-solid-ownership-kind='tracked-effect'] {
+  background: var(--start-dt-kind-tracked-effect);
+}
+
+[data-solid-ownership-detail] {
+  display: flex;
+  flex-direction: column;
+
+  width: 20rem;
+  flex-shrink: 0;
+  min-height: 0;
+
+  overflow-y: auto;
+
+  border-left: var(--start-dt-border-soft) 1px solid;
+}
+
+[data-solid-ownership-detail-content] {
+  display: flex;
+  flex-direction: column;
+
+  gap: 0.5rem;
+
+  padding: 0.625rem 0.75rem;
+}
+
+[data-solid-ownership-detail-head] {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+
+  gap: 0.375rem;
+
+  min-width: 0;
+}
+
+[data-solid-ownership-location] {
+  align-self: flex-start;
+
+  padding: 0.125rem 0.375rem;
+
+  border: var(--start-dt-border) 1px solid;
+  border-radius: 0.375rem;
+  background: var(--start-dt-surface);
+  color: var(--start-dt-accent);
+
+  cursor: pointer;
+
+  max-width: 100%;
+  overflow: hidden;
+}
+
+[data-solid-ownership-location]:hover {
+  background: var(--start-dt-surface-hover);
+}
+
+[data-solid-ownership-detail-block] {
+  display: flex;
+  flex-direction: column;
+
+  gap: 0.25rem;
+
+  padding-top: 0.5rem;
+
+  border-top: var(--start-dt-border-soft) 1px solid;
+}
+
+[data-solid-ownership-note] {
+  color: var(--start-dt-text-muted);
+}
+
+[data-solid-ownership-signals] {
+  display: flex;
+  flex-direction: column;
+
+  gap: 0.125rem;
+}
+
+[data-solid-ownership-signal] {
+  display: grid;
+  grid-template-columns: minmax(4rem, 40%) 1fr auto;
+  align-items: baseline;
+
+  gap: 0.5rem;
+
+  padding: 0.125rem 0.25rem;
+
+  border-radius: 0.25rem;
+}
+
+[data-solid-ownership-signal]:hover {
+  background: var(--start-dt-surface-hover);
+}
+
+/* The action stays out of the way until the row is pointed at or focused. */
+[data-solid-ownership-view-graph] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0.125rem;
+
+  border: none;
+  border-radius: 0.25rem;
+  background: none;
+  color: var(--start-dt-accent);
+
+  cursor: pointer;
+  opacity: 0;
+}
+
+[data-solid-ownership-signal]:hover [data-solid-ownership-view-graph],
+[data-solid-ownership-view-graph]:focus-visible {
+  opacity: 1;
+}
+
+[data-solid-ownership-view-graph]:hover {
+  background: var(--start-dt-accent-soft);
+}
+
+/* The selected owner's own action sits in the heading, so it is always shown. */
+[data-solid-ownership-detail-head] [data-solid-ownership-view-graph] {
+  margin-left: auto;
+  opacity: 1;
+}
+
+/* The toolbar sizes every svg as a large icon. Row actions need a small one. */
+[data-solid-ownership-signal] [data-solid-ownership-view-graph] svg,
+[data-solid-ownership-detail-head] [data-solid-ownership-view-graph] svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+[data-solid-ownership-scope-name] {
+  display: inline-flex;
+  align-items: center;
+
+  gap: 0.375rem;
+
+  min-width: 0;
+  overflow: hidden;
+}
+
+[data-solid-ownership-scope-name] > [data-solid-text-size] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-solid-ownership-signal] > [data-solid-text-size]:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-solid-ownership-signal-value] {
+  color: var(--start-dt-text-muted);
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-solid-ownership-stack] {
+  display: flex;
+  flex-direction: column;
+
+  gap: 0.125rem;
+}
+
+[data-solid-ownership-frame] {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+
+  gap: 0.375rem;
+
+  padding: 0.1875rem 0.375rem;
+
+  border: none;
+  border-radius: 0.375rem;
+  background: none;
+  color: var(--start-dt-text);
+
+  text-align: left;
+  cursor: pointer;
+
+  min-width: 0;
+}
+
+[data-solid-ownership-frame]:hover {
+  background: var(--start-dt-surface-hover);
+}
+
+[data-solid-ownership-frame][data-current] {
+  background: var(--start-dt-surface-active);
+}
+
+[data-solid-ownership-frame-index] {
+  width: 1rem;
+  flex-shrink: 0;
+
+  color: var(--start-dt-text-muted);
+
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.625rem;
+  text-align: right;
+}
+
+[data-solid-ownership-frame-name] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-solid-ownership-frame-location] {
+  margin-left: auto;
+
+  color: var(--start-dt-text-muted);
+
+  direction: rtl;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 55%;
+}
+
+[data-solid-ownership-chips] {
+  display: flex;
+  flex-wrap: wrap;
+
+  gap: 0.25rem;
+}
+
+[data-solid-ownership-chip] {
+  display: inline-flex;
+  align-items: center;
+
+  gap: 0.25rem;
+
+  padding: 0.125rem 0.5rem;
+
+  border-radius: 9999px;
+  border: var(--start-dt-border) 1px solid;
+  background: var(--start-dt-surface);
+  color: var(--start-dt-text);
+
+  cursor: pointer;
+}
+
+button[data-solid-ownership-chip]:hover {
+  background: var(--start-dt-surface-hover);
+}

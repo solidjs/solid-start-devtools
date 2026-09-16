@@ -7,12 +7,14 @@ import IconButton from '../ui/IconButton.js';
 import { Text } from '../ui/Text.js';
 import { type ServerFunctionInstance, ServerFunctionViewer } from './functions/index.js';
 import { captureServerFunctionCall } from './functions/tracker.js';
-import { ErrorIcon, FunctionIcon, GraphIcon, SolidIcon } from './icons.js';
+import { ErrorIcon, FunctionIcon, GraphIcon, SolidIcon, TreeIcon } from './icons.js';
+import { excludeOwner, includeOwner } from './ownership/registry.js';
 import { excludeReactiveOwner, includeReactiveOwner } from './reactivity/registry.js';
 import './index.css';
 
 const ErrorViewer = clientOnly(() => import('./error-viewer/index.js'), { lazy: true });
 const ReactivityViewer = clientOnly(() => import('./reactivity/index.js'), { lazy: true });
+const OwnershipViewer = clientOnly(() => import('./ownership/index.js'), { lazy: true });
 
 export interface DevToolbarProps {
   children?: JSX.Element;
@@ -23,13 +25,17 @@ export interface DevToolbarProps {
  * even though the toolbar's own scope encloses it.
  */
 function AppScope(props: { children?: JSX.Element }): JSX.Element {
-  includeReactiveOwner(getOwner());
+  const owner = getOwner();
+  includeReactiveOwner(owner);
+  includeOwner(owner);
   return <>{props.children}</>;
 }
 
 export function DevToolbar(props: DevToolbarProps) {
-  // Everything the toolbar creates stays out of the reactivity graph it renders.
-  excludeReactiveOwner(getOwner());
+  // Everything the toolbar creates stays out of the graph and the tree it renders.
+  const owner = getOwner();
+  excludeReactiveOwner(owner);
+  excludeOwner(owner);
 
   const [ref, setRef] = createSignal<HTMLElement>();
 
@@ -137,9 +143,15 @@ export function DevToolbar(props: DevToolbarProps) {
     },
   );
 
-  const [content, setContent] = createSignal<'fn' | 'err' | 'rx' | undefined>(undefined);
+  const [content, setContent] = createSignal<'fn' | 'err' | 'rx' | 'own' | undefined>(undefined);
 
-  function toggleContent(value: 'fn' | 'err' | 'rx') {
+  // A panel can ask the graph to show a node. Each request is a new object, so
+  // asking for the same node twice still moves the view.
+  const [graphFocus, setGraphFocus] = createSignal<{ node: object }>();
+  // The graph can ask the ownership tree to show an owner the same way.
+  const [ownershipFocus, setOwnershipFocus] = createSignal<{ owner: object }>();
+
+  function toggleContent(value: 'fn' | 'err' | 'rx' | 'own') {
     if (content() === value) {
       setContent(undefined);
     } else {
@@ -214,6 +226,9 @@ export function DevToolbar(props: DevToolbarProps) {
               <IconButton onClick={() => toggleContent('rx')}>
                 <GraphIcon title="View Reactivity Graph" />
               </IconButton>
+              <IconButton onClick={() => toggleContent('own')}>
+                <TreeIcon title="View Ownership Tree" />
+              </IconButton>
             </div>
             <div>
               <SolidIcon title="Start Devtools Version" />
@@ -225,7 +240,22 @@ export function DevToolbar(props: DevToolbarProps) {
             </div>
           </Toolbar>
           <ErrorViewer show={content() === 'err'} errors={errors()} resetError={resetError} />
-          <ReactivityViewer show={content() === 'rx'} />
+          <ReactivityViewer
+            show={content() === 'rx'}
+            focus={graphFocus()}
+            onViewOwner={(owner) => {
+              setOwnershipFocus({ owner });
+              setContent('own');
+            }}
+          />
+          <OwnershipViewer
+            show={content() === 'own'}
+            focus={ownershipFocus()}
+            onViewInGraph={(node) => {
+              setGraphFocus({ node });
+              setContent('rx');
+            }}
+          />
           <ServerFunctionViewer
             show={content() === 'fn'}
             instances={instances()}

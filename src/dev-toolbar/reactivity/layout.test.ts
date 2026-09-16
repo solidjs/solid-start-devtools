@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { edgePath, layoutGraph, LAYER_GAP, NODE_HEIGHT, NODE_WIDTH } from './layout.js';
+import {
+  edgePath,
+  layoutGraph,
+  LAYER_GAP,
+  NODE_HEIGHT,
+  NODE_WIDTH,
+  placeHoverCard,
+} from './layout.js';
 
 const node = (id: string) => ({ id, name: id, kind: 'signal' as const });
 const effect = (id: string) => ({ id, name: id, kind: 'effect' as const });
@@ -134,5 +141,51 @@ describe('edgePath', () => {
     const to = { id: 'b', layer: 1, index: 1, x: NODE_WIDTH + 10, y: 60 };
 
     expect(edgePath(from, to)).toContain(`C ${NODE_WIDTH + 40} ${NODE_HEIGHT / 2}`);
+  });
+});
+
+describe('placeHoverCard', () => {
+  const canvas = { width: 800, height: 600 };
+  const card = { width: 288, height: 150 };
+  const node = (left: number, top: number) => ({ left, top, width: 150, height: 44 });
+
+  it('puts the card under the node when there is room', () => {
+    const placement = placeHoverCard({ node: node(300, 100), canvas, card });
+
+    expect(placement.side).toBe('below');
+    expect(placement.y).toBe(100 + 44 + 8);
+  });
+
+  it('puts the card over the node when the space below is too short', () => {
+    const placement = placeHoverCard({ node: node(300, 520), canvas, card });
+
+    expect(placement.side).toBe('above');
+    expect(placement.y).toBe(520 - 8);
+  });
+
+  it('never overlaps the node vertically', () => {
+    for (const top of [0, 120, 300, 450, 556]) {
+      const placement = placeHoverCard({ node: node(300, top), canvas, card });
+      const cardTop = placement.side === 'below' ? placement.y : placement.y - card.height;
+      const cardBottom = cardTop + card.height;
+      expect(cardBottom <= top || cardTop >= top + 44).toBe(true);
+    }
+  });
+
+  it('centers the card on the node', () => {
+    const placement = placeHoverCard({ node: node(300, 100), canvas, card });
+
+    expect(placement.left + card.width / 2).toBe(300 + 75);
+    expect(placement.caret).toBe(card.width / 2);
+  });
+
+  it('keeps the card inside the canvas and points the caret at the node', () => {
+    const atLeft = placeHoverCard({ node: node(0, 100), canvas, card });
+    const atRight = placeHoverCard({ node: node(650, 100), canvas, card });
+
+    expect(atLeft.left).toBe(8);
+    expect(atLeft.caret).toBe(75 - 8);
+    expect(atRight.left).toBe(800 - 288 - 8);
+    expect(atRight.left + atRight.caret).toBe(650 + 75);
   });
 });

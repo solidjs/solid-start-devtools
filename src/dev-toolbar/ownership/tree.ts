@@ -1,0 +1,302 @@
+/** Raw owner or signal from the runtime. Only the fields the tree needs are read. */
+export type RawNode = Record<string, any>;
+
+const REACTIVE_DISPOSED = 1 << 6;
+
+const EFFECT_RENDER = 1;
+const EFFECT_USER = 2;
+const EFFECT_TRACKED = 3;
+
+export type OwnerKind =
+  | 'component'
+  | 'root'
+  | 'memo'
+  | 'effect'
+  | 'render-effect'
+  | 'tracked-effect'
+  | 'scope';
+
+const KIND_LABELS: Record<OwnerKind, string> = {
+  component: 'component',
+  root: 'root',
+  memo: 'memo',
+  effect: 'effect',
+  'render-effect': 'render effect',
+  'tracked-effect': 'tracked effect',
+  scope: 'scope',
+};
+
+export interface OwnedSignal {
+  id: string;
+  name: string;
+  value: unknown;
+  /** Clock tick of the last write, so a new value changes the fingerprint. */
+  time: number;
+  /** The runtime node, so another panel can find the same signal. */
+  node: RawNode;
+}
+
+/** A scope folded into the component above it, such as a memo or an effect. */
+export interface FoldedScope {
+  id: string;
+  kind: OwnerKind;
+  name: string;
+  value: unknown;
+  hasValue: boolean;
+  /** Clock tick of the last recompute, so a new value changes the fingerprint. */
+  time: number;
+  /** The runtime owner, so another panel can find the same memo or effect. */
+  node: RawNode;
+}
+
+export interface TreeNode {
+  id: string;
+  parentId: string | undefined;
+  kind: OwnerKind;
+  name: string;
+  depth: number;
+  children: string[];
+  /** Signals this owner created, plus those of the scopes it stands in for. */
+  signals: OwnedSignal[];
+  /**
+   * Prop names of a component. Props are getters, so the tree lists the names
+   * and never reads the values.
+   */
+  props: string[] | undefined;
+  /** Current value of a computed owner. */
+  value: unknown;
+  hasValue: boolean;
+  /** Clock tick of the last recompute of a computed owner. */
+  time: number;
+  disposed: boolean;
+  /** Owners this node stands in for, when scopes are folded away. */
+  scopes: FoldedScope[];
+  /** Where the component is declared, as `file:line:column`. */
+  location: string | undefined;
+  /** The runtime owner, so another panel can find the same memo or effect. */
+  owner: RawNode;
+}
+
+export interface OwnershipTree {
+  nodes: TreeNode[];
+  roots: string[];
+  /** Cheap identity of the tree. Equal fingerprints mean nothing changed. */
+  fingerprint: string;
+}
+
+export const EMPTY_TREE: OwnershipTree = { nodes: [], roots: [], fingerprint: 'empty' };
+
+export function isComponent(owner: RawNode): boolean {
+  return !!owner._component;
+}
+
+function isComputed(owner: RawNode): boolean {
+  return '_deps' in owner && typeof owner._fn === 'function';
+}
+
+export function ownerKind(owner: RawNode): OwnerKind {
+  if (isComponent(owner)) return 'component';
+  if (isComputed(owner)) {
+    switch (owner._type) {
+      case EFFECT_RENDER:
+        return 'render-effect';
+      case EFFECT_USER:
+        return 'effect';
+      case EFFECT_TRACKED:
+        return 'tracked-effect';
+      default:
+        return 'memo';
+    }
+  }
+  if (owner._root) return 'root';
+  return 'scope';
+}
+
+/** The hot reload transform wraps components, and its wrapper carries the tag. */
+const REFRESH_PREFIX = '[solid-refresh]';
+
+function withoutRefreshTag(name: unknown): string | undefined {
+  if (typeof name !== 'string' || name.length === 0) return undefined;
+  return name.startsWith(REFRESH_PREFIX) ? name.slice(REFRESH_PREFIX.length) : name;
+}
+
+export function ownerName(owner: RawNode, kind: OwnerKind): string {
+  if (kind === 'component') {
+    return `<${withoutRefreshTag(owner._component?.name) ?? 'Anonymous'}>`;
+  }
+  // The memo the hot reload wrapper creates carries the same tag.
+  return withoutRefreshTag(owner._name) ?? KIND_LABELS[kind];
+}
+
+/**
+ * Where a component is declared.
+ *
+ * The hot reload transform records this on its wrapper, so it is there whenever
+ * a build runs that transform. Components compiled without it have no location.
+ */
+function componentLocation(owner: RawNode): string | undefined {
+  try {
+    const location = owner._component?.fn?.location;
+    return typeof location === 'string' && location.length > 0 ? location : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function propNames(owner: RawNode): string[] | undefined {
+  const props = owner._component?.props;
+  if (!props || typeof props !== 'object') return undefined;
+  try {
+    return Object.keys(props);
+  } catch {
+    return undefined;
+  }
+}
+
+/** The runtime clock of a node's last write. Zero for owners that hold no value. */
+function timeOf(node: RawNode): number {
+  return typeof node._time === 'number' ? node._time : 0;
+}
+
+function isDisposed(owner: RawNode): boolean {
+  return typeof owner._flags === 'number' && (owner._flags & REACTIVE_DISPOSED) !== 0;
+}
+
+export interface BuildOptions {
+  children(owner: RawNode): RawNode[];
+  signals(owner: RawNode): RawNode[];
+  identify(node: object): string;
+  /** Owners that belong to the toolbar. Their subtree is hidden. */
+  isExcluded(owner: RawNode): boolean;
+  /** Owners that are app code again, even inside a hidden subtree. */
+  isIncluded(owner: RawNode): boolean;
+  /** Show components only, folding the scopes between them away. */
+  componentsOnly: boolean;
+  /** Keep owners the runtime already disposed. */
+  includeDisposed?: boolean;
+}
+
+/**
+ * Builds the owner tree, depth first.
+ *
+ * In component mode only component owners become rows. The scopes between them
+ * are folded into the nearest component above, and the signals those scopes own
+ * are listed on that component, so a component shows everything created under
+ * it.
+ */
+export function buildOwnershipTree(roots: RawNode[], options: BuildOptions): OwnershipTree {
+  const nodes: TreeNode[] = [];
+  const topLevel: string[] = [];
+  const seen = new Set<RawNode>();
+
+  function describe(owner: RawNode, parentId: string | undefined, depth: number): TreeNode {
+    const kind = ownerKind(owner);
+    const node: TreeNode = {
+      id: options.identify(owner),
+      parentId,
+      kind,
+      name: ownerName(owner, kind),
+      depth,
+      children: [],
+      signals: [],
+      props: kind === 'component' ? propNames(owner) : undefined,
+      location: kind === 'component' ? componentLocation(owner) : undefined,
+      value: '_value' in owner ? owner._value : undefined,
+      hasValue: '_value' in owner,
+      time: timeOf(owner),
+      disposed: isDisposed(owner),
+      scopes: [],
+      owner,
+    };
+    nodes.push(node);
+    if (parentId === undefined) topLevel.push(node.id);
+    return node;
+  }
+
+  function collectSignals(owner: RawNode, into: TreeNode): void {
+    for (const signal of options.signals(owner)) {
+      if (!signal || typeof signal !== 'object') continue;
+      const name = signal._name;
+      into.signals.push({
+        id: options.identify(signal),
+        name: typeof name === 'string' && name.length > 0 ? name : 'signal',
+        value: signal._value,
+        time: timeOf(signal),
+        node: signal,
+      });
+    }
+  }
+
+  function walk(owner: RawNode, host: TreeNode | undefined, depth: number, hidden: boolean): void {
+    if (!owner || typeof owner !== 'object' || seen.has(owner)) return;
+    seen.add(owner);
+
+    // The nearest marker decides. The toolbar wraps the app, so the app's own
+    // scope sits inside the toolbar's hidden subtree and turns visibility back
+    // on for everything below it. The marker itself is toolbar code, so it
+    // never becomes a row.
+    if (options.isIncluded(owner)) {
+      for (const child of options.children(owner)) walk(child, undefined, 0, false);
+      return;
+    }
+
+    if (options.isExcluded(owner) || hidden) {
+      for (const child of options.children(owner)) walk(child, undefined, 0, true);
+      return;
+    }
+
+    if (isDisposed(owner) && !options.includeDisposed) return;
+
+    const shown = !options.componentsOnly || isComponent(owner);
+
+    if (shown) {
+      const node = describe(owner, host?.id, depth);
+      if (host) host.children.push(node.id);
+      collectSignals(owner, node);
+      for (const child of options.children(owner)) walk(child, node, depth + 1, false);
+      return;
+    }
+
+    // Folded scope. Its signals and children belong to the component above it.
+    if (host) {
+      const kind = ownerKind(owner);
+      host.scopes.push({
+        id: options.identify(owner),
+        kind,
+        name: ownerName(owner, kind),
+        value: '_value' in owner ? owner._value : undefined,
+        hasValue: '_value' in owner,
+        time: timeOf(owner),
+        node: owner,
+      });
+      collectSignals(owner, host);
+    }
+    for (const child of options.children(owner)) walk(child, host, depth, false);
+  }
+
+  for (const root of roots) walk(root, undefined, 0, false);
+
+  let fingerprint = `${nodes.length}:${topLevel.length}`;
+  for (const node of nodes) {
+    // Write times are part of it, so a value changing without the tree moving
+    // still renders.
+    fingerprint += `|${node.id}${node.kind}@${node.time}${node.children.length}${
+      node.signals.length
+    }${node.scopes.length}${node.disposed ? 'd' : ''}`;
+    for (const signal of node.signals) fingerprint += `,${signal.id}@${signal.time}`;
+    for (const scope of node.scopes) fingerprint += `;${scope.id}@${scope.time}`;
+  }
+
+  return { nodes, roots: topLevel, fingerprint };
+}
+
+/** Ids of `id` and every node above it, used to keep matches visible. */
+export function ancestorsOf(nodes: Map<string, TreeNode>, id: string): string[] {
+  const path: string[] = [];
+  let current = nodes.get(id);
+  while (current?.parentId) {
+    path.push(current.parentId);
+    current = nodes.get(current.parentId);
+  }
+  return path;
+}

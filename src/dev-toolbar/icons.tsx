@@ -506,7 +506,7 @@ export function TrashIcon(props: JSX.IntrinsicElements['svg'] & { title: string 
   );
 }
 
-export function GraphIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
+export function TreeIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -517,10 +517,10 @@ export function GraphIcon(props: JSX.IntrinsicElements['svg'] & { title: string 
     >
       <title>{props.title}</title>
       <g stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6">
-        <circle cx="5" cy="12" r="2.4" />
-        <circle cx="19" cy="6" r="2.4" />
-        <circle cx="19" cy="18" r="2.4" />
-        <path d="M7.1 10.8 16.9 7.2M7.1 13.2l9.8 3.6" />
+        <rect x="8.5" y="3" width="7" height="4.6" rx="1.2" />
+        <rect x="3" y="16.4" width="7" height="4.6" rx="1.2" />
+        <rect x="14" y="16.4" width="7" height="4.6" rx="1.2" />
+        <path d="M12 7.6v4.2M6.5 16.4v-2.5a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v2.5" />
       </g>
     </svg>
   );
@@ -556,6 +556,66 @@ export function PlayIcon(props: JSX.IntrinsicElements['svg'] & { title: string }
   );
 }
 
+export function ExpandIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      {...props}
+    >
+      <title>{props.title}</title>
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.8"
+        d="m8 9 4 4 4-4M8 15l4 4 4-4M4 5h16"
+      />
+    </svg>
+  );
+}
+
+export function CollapseIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      {...props}
+    >
+      <title>{props.title}</title>
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.8"
+        d="m8 13 4-4 4 4M8 19l4-4 4 4M4 5h16"
+      />
+    </svg>
+  );
+}
+
+export function GraphIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      {...props}
+    >
+      <title>{props.title}</title>
+      <g stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6">
+        <circle cx="5" cy="12" r="2.4" />
+        <circle cx="19" cy="6" r="2.4" />
+        <circle cx="19" cy="18" r="2.4" />
+        <path d="M7.1 10.8 16.9 7.2M7.1 13.2l9.8 3.6" />
+      </g>
+    </svg>
+  );
+}
+
 export function FitIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
   return (
     <svg
@@ -571,6 +631,32 @@ export function FitIcon(props: JSX.IntrinsicElements['svg'] & { title: string })
         stroke-linejoin="round"
         stroke-width="1.8"
         d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9m6 0h3.5A1.5 1.5 0 0 1 20 5.5V9m0 6v3.5a1.5 1.5 0 0 1-1.5 1.5H15m-6 0H5.5A1.5 1.5 0 0 1 4 18.5V15"
+      />
+    </svg>
+  );
+}
+
+export function EyeIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      {...props}
+    >
+      <title>{props.title}</title>
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.6"
+        d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"
+      />
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.6"
+        d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
       />
     </svg>
   );

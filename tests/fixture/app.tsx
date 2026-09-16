@@ -32,8 +32,11 @@ function emitServerFunctionResponse() {
   responseStatus = 500;
 }
 
-function App() {
-  const [broken, setBroken] = createSignal(false);
+function Greeting(props: { name: string }) {
+  return <p id="fixture-greeting">{`hello ${props.name}`}</p>;
+}
+
+function Counter() {
   const [count, setCount] = createSignal(0, { name: 'count' });
   const doubled = createMemo(() => count() * 2, { name: 'doubled' });
 
@@ -46,11 +49,20 @@ function App() {
   );
 
   return (
+    <button id="increment-count" onClick={() => setCount((value) => value + 1)}>
+      {`count ${count()} doubled ${doubled()}`}
+    </button>
+  );
+}
+
+function App() {
+  const [broken, setBroken] = createSignal(false);
+
+  return (
     <main>
       <p id="fixture-content">app content</p>
-      <button id="increment-count" onClick={() => setCount((value) => value + 1)}>
-        {`count ${count()} doubled ${doubled()}`}
-      </button>
+      <Greeting name="ada" />
+      <Counter />
       <button id="emit-server-function-request" onClick={emitServerFunctionRequest}>
         emit server function request
       </button>
