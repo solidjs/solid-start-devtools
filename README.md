@@ -36,11 +36,36 @@ Two demo apps live in `examples`.
 
 - `examples/demo` is a small orders dashboard that exercises every panel.
 - `examples/explorer` is a file explorer whose component tree grows as you open folders.
+- `examples/docks` renders the panels inside the Vite DevTools dock instead of the toolbar.
 
 ```sh
 pnpm demo
 pnpm demo:explorer
+pnpm demo:docks
 ```
+
+## Vite DevTools
+
+The panels also run inside the Vite DevTools dock. Add the plugin to a project that has
+Vite DevTools installed:
+
+```ts
+import { solidDevtoolsDocks } from '@solidjs/start-devtools/vite';
+
+export default defineConfig({
+  plugins: [solid(), solidDevtoolsDocks()],
+});
+```
+
+The dock gains a `Reactivity Graph` entry and an `Ownership Tree` entry. Both render in the
+page the app runs in, so they read the same runtime the toolbar reads, and a jump between
+the two switches dock entries. `examples/docks` is a small app set up this way:
+
+```sh
+pnpm demo:docks
+```
+
+The floating toolbar is unaffected. Use whichever suits the project, or both.
 
 ## Reactivity graph
 

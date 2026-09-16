@@ -1,5 +1,6 @@
 import { transformAsync } from '@dom-expressions/compiler';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'rolldown';
 import { dts } from 'rolldown-plugin-dts';
 
@@ -47,8 +48,11 @@ function css(server = false) {
     transform(code, id) {
       if (!id.endsWith('.css')) return null;
       if (server) return { code: '', map: null, moduleType: 'js' };
+      // The panels also render inside a shadow root, which the document head
+      // does not reach, so the text goes through the registry instead.
+      const registry = fileURLToPath(new URL('./src/dev-toolbar/styles.ts', import.meta.url));
       return {
-        code: `const style = document.createElement('style');\nstyle.textContent = ${JSON.stringify(code)};\ndocument.head.append(style);`,
+        code: `import { registerStyle } from ${JSON.stringify(registry)};\nregisterStyle(${JSON.stringify(code)});`,
         map: null,
         moduleType: 'js',
       };
@@ -93,11 +97,22 @@ function external(id) {
     id === 'solid-js' ||
     id.startsWith('solid-js/') ||
     id === '@solidjs/web' ||
-    id.startsWith('@solidjs/web/')
+    id.startsWith('@solidjs/web/') ||
+    // The Vite plugin entry only borrows types from these.
+    id === 'vite' ||
+    id === '@vitejs/devtools-kit' ||
+    id.startsWith('@vitejs/devtools-kit/')
   );
 }
 
-function config({ input, entryFileNames, chunkFileNames, generate, server = false }) {
+function config({
+  input,
+  entryFileNames,
+  chunkFileNames,
+  generate,
+  server = false,
+  clean = false,
+}) {
   return {
     input,
     platform: server ? 'node' : 'browser',
@@ -108,7 +123,8 @@ function config({ input, entryFileNames, chunkFileNames, generate, server = fals
       entryFileNames,
       chunkFileNames,
       assetFileNames: 'assets/[name]-[hash][extname]',
-      cleanDir: !server,
+      // Only the first build clears the folder, so later ones keep its output.
+      cleanDir: clean,
       sourcemap: true,
     },
     external,
@@ -119,6 +135,7 @@ function config({ input, entryFileNames, chunkFileNames, generate, server = fals
 export default defineConfig([
   config({
     input: 'src/index.tsx',
+    clean: true,
     entryFileNames: 'index.js',
     chunkFileNames: 'chunks/[name]-[hash].js',
     generate: 'dom',
@@ -130,6 +147,25 @@ export default defineConfig([
     generate: 'ssr',
     server: true,
   }),
+  // One build, so the panel and the page agent share the registries. Built
+  // apart they would each hold their own copy, and the panel would read a
+  // registry nothing wrote to.
+  config({
+    input: {
+      'devtools-renderer': 'src/devtools/renderer.tsx',
+      'devtools-collector': 'src/devtools/collector.ts',
+    },
+    entryFileNames: '[name].js',
+    chunkFileNames: 'devtools-chunks/[name]-[hash].js',
+    generate: 'dom',
+  }),
+  config({
+    input: 'src/vite.ts',
+    entryFileNames: 'vite.js',
+    chunkFileNames: 'vite-chunks/[name]-[hash].js',
+    generate: 'ssr',
+    server: true,
+  }),
   config({
     input: 'src/noop.ts',
     entryFileNames: 'noop.js',
@@ -138,7 +174,12 @@ export default defineConfig([
     server: true,
   }),
   {
-    input: 'src/index.tsx',
+    input: {
+      index: 'src/index.tsx',
+      vite: 'src/vite.ts',
+      'devtools-renderer': 'src/devtools/renderer.tsx',
+      'devtools-collector': 'src/devtools/collector.ts',
+    },
     output: {
       format: 'esm',
       dir: 'dist/types',

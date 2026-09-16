@@ -19,6 +19,18 @@
         "import": "./dist/index.js"
       },
       "default": "./dist/noop.js"
+    },
+    "./vite": {
+      "types": "./dist/types/vite.d.ts",
+      "default": "./dist/vite.js"
+    },
+    "./devtools-renderer": {
+      "types": "./dist/types/devtools-renderer.d.ts",
+      "default": "./dist/devtools-renderer.js"
+    },
+    "./devtools-collector": {
+      "types": "./dist/types/devtools-collector.d.ts",
+      "default": "./dist/devtools-collector.js"
     }
   },
   "scripts": {
@@ -31,7 +43,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit -p tsconfig.tests.json",
-    "release": "pnpm build && changeset publish"
+    "release": "pnpm build && changeset publish",
+    "demo:docks": "pnpm build && vite --config examples/docks/vite.config.ts"
   },
   "repository": {
     "type": "git",
@@ -64,6 +77,8 @@
     "@solidjs/vite-plugin": "3.0.0-next.35",
     "@solidjs/web": "^2.0.0-rc.0",
     "@types/node": "^24.0.0",
+    "@vitejs/devtools": "^0.7.5",
+    "@vitejs/devtools-kit": "^0.7.5",
     "error-stack-parser-es": "^2.0.1",
     "html-to-image": "^1.11.13",
     "oxfmt": "^0.64.0",
@@ -75,7 +90,7 @@
     "solid-js": "^2.0.0-rc.0",
     "terracotta": "2.0.0-next.9",
     "typescript": "^7.0.2",
-    "vite": "^8.2.1",
+    "vite": "^8.3.0",
     "vitest": "^4.1.11"
   },
   "packageManager": "pnpm@11.22.0"
