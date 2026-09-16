@@ -1,5 +1,26 @@
 # @solidjs/start-devtools
 
+## 1.0.0-next.5
+
+### Patch Changes
+
+- 341960b: Add an ownership tree panel to the dev toolbar.
+
+  The panel shows the app as a tree of owners. Component mode lists components only and folds the scopes between them into the component above, so a component shows the signals, memos and effects created inside it. Owner mode shows every owner.
+  Selecting a row lists its prop names, the signals it holds with their values, the scopes folded into it, its children, and the ancestry it was created under.
+  Components show where they are declared, and clicking the location opens the file in your editor.
+  Rows flash when an owner is created, and the tree can be searched by component, scope or signal.
+
+- b1177e3: Add a reactivity graph panel to the dev toolbar.
+
+  The panel maps live signals, memos and effects as a directed graph.
+  Hovering a node shows its value, state, owner and edge counts.
+  Selecting a node highlights everything upstream and downstream of it and lists its sources and observers.
+  The selected node's value is shown as an expandable tree, the same one the server function panel uses for serialized values.
+  Nodes pulse and count changes as the app updates, and the graph can be filtered by kind or searched by name, value or owner.
+
+- cb0e333: Update terracotta to `2.0.0-next.9`.
+
 ## 1.0.0-next.4
 
 ### Patch Changes

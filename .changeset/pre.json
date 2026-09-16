@@ -9,8 +9,11 @@
     "initial-release",
     "modern-toolchain",
     "native-oxc-toolchain",
+    "ownership-tree",
     "quiet-cats-smile",
+    "reactivity-graph",
     "safe-production-imports",
+    "terracotta-next-9",
     "toolbar-redesign"
   ]
 }
