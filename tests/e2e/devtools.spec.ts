@@ -50,9 +50,10 @@ test('captures client errors', async ({ page }) => {
   await expect(code.locator('.l.focus')).toContainText('client boom');
   await expect(code.locator('.tok.error')).toHaveCount(1);
 
-  // The view scrolls, so it holds the lines the reader can scroll to rather
-  // than a window cut around the frame.
+  // The window around the frame is what the view scrolls through: lines near
+  // it are there, lines far from it are not.
   await expect(code).toContainText('emitServerFunctionResponse');
+  await expect(code).not.toContainText('__disposeToolbar');
 
   // It opens on the frame instead of the top of the file.
   expect(

@@ -55,8 +55,8 @@ describe('buildSnippet', () => {
     expect(source.split('\n')[0]).toBe('// [!focus :7]');
   });
 
-  it('keeps the whole file and hides what sits outside the window', () => {
-    const { source, hidden, firstLine } = buildSnippet({
+  it('keeps the whole file and names the window around the frame', () => {
+    const { source, first, last, offset } = buildSnippet({
       content: FILE,
       line: 6,
       column: 3,
@@ -64,15 +64,12 @@ describe('buildSnippet', () => {
     });
 
     expect(source).toContain('A block comment the window would cut in half.');
-    expect(firstLine).toBe(5);
-    expect(hidden).toHaveLength(2);
-    // The head runs to the start of the first shown line, the tail to the end.
-    expect(hidden[0]!.start).toBe(0);
-    expect(hidden[1]!.end).toBe(source.length);
+    expect({ first, last, offset }).toEqual({ first: 5, last: 7, offset: 2 });
   });
 
-  it('hides nothing when the window covers the file', () => {
-    expect(buildSnippet({ content: FILE, line: 5, range: 50 }).hidden).toHaveLength(0);
+  it('stops the window at the ends of the file', () => {
+    const { first, last } = buildSnippet({ content: FILE, line: 5, range: 50 });
+    expect({ first, last }).toEqual({ first: 1, last: 9 });
   });
 });
 
@@ -90,7 +87,16 @@ describe('codeToHtml', () => {
 
     expect(html).toContain('<span class="tok keyword">throw</span>');
     expect(html).not.toContain('A block comment');
-    expect(html).toContain('<span class="ln">5</span>');
+  });
+
+  // The numbers are the file's own, and only the window's lines are kept.
+  it('keeps the window and numbers it by the file', () => {
+    const html = codeToHtml({ fileName: 'boom.ts', content: FILE, line: 6, column: 3, range: 1 });
+    const numbers = [...html.matchAll(/<span class="ln">(\d+)<\/span>/g)].map((match) =>
+      Number(match[1]),
+    );
+
+    expect(numbers).toEqual([5, 6, 7]);
   });
 
   it('puts the frame in focus and marks its word', () => {
