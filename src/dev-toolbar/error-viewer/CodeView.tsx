@@ -1,97 +1,63 @@
 // @refresh skip
-import { getSingletonHighlighterCore, type HighlighterCore } from 'shiki/core';
-import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
-import langJS from 'shiki/langs/javascript.mjs';
-import langJSX from 'shiki/langs/jsx.mjs';
-import langTSX from 'shiki/langs/tsx.mjs';
-import langTS from 'shiki/langs/typescript.mjs';
-import url from 'shiki/onig.wasm?url';
-import darkPlus from 'shiki/themes/dark-plus.mjs';
-import { createEffect, createMemo } from 'solid-js';
+import { err, hl } from '@twinkleplop/annotation';
+import { language as tsxLanguage } from '@twinkleplop/tsx';
+import { language as typescriptLanguage } from '@twinkleplop/typescript';
+import { createMemo } from 'solid-js';
+import { withMarkers } from './marker.js';
 import type { JSX } from '@solidjs/web';
+import '@twinkleplop/theme-github/dark';
 
-let HIGHLIGHTER: HighlighterCore;
+const options = {
+  annotation: {
+    plugins: [hl, err],
+    // The markers are written by the panel, not by the reader, so a bad one is
+    // a bug here rather than something the app's console should carry.
+    on_error: () => {},
+  },
+};
 
-async function loadHighlighter() {
-  if (!HIGHLIGHTER) {
-    HIGHLIGHTER = await getSingletonHighlighterCore({
-      engine: createOnigurumaEngine(fetch(url)),
-      themes: [darkPlus],
-      langs: [langJS, langJSX, langTS, langTSX],
-    });
-  }
-  return HIGHLIGHTER;
+const highlighters = {
+  ts: typescriptLanguage(options),
+  tsx: tsxLanguage(options),
+};
+
+/** The grammar for a file. The TSX grammar also covers plain JavaScript and JSX. */
+function highlighterFor(fileName: string): (input: string, render?: object) => string {
+  const extension = fileName.split(/[#?]/)[0]!.split('.').pop()?.trim();
+  return extension === 'ts' || extension === 'mts' || extension === 'cts'
+    ? highlighters.ts
+    : highlighters.tsx;
 }
 
 export interface CodeViewProps {
   fileName: string;
   content: string;
   line: number;
+  /** Column of the error, so the marker can point at one word instead of the line. */
+  column?: number;
 }
 
 const RANGE = 15;
 
 export function CodeView(props: CodeViewProps): JSX.Element | null {
-  const lines = () =>
-    props.content.split('\n').map((item, index) => ({
-      index: index + 1,
-      line: item,
-    }));
+  const lines = () => props.content.split('\n');
 
   const minLine = () => Math.max(props.line - (1 + RANGE), 0);
   const maxLine = () => Math.min(props.line + RANGE, lines().length - 1);
 
-  let ref: HTMLDivElement | undefined;
+  const html = createMemo(() => {
+    const snippet = lines().slice(minLine(), maxLine());
+    const source = withMarkers({
+      snippet,
+      // 1-based line of the error inside the snippet.
+      line: props.line - minLine(),
+      column: props.column,
+    });
 
-  const data = createMemo(async () => {
-    const value = lines()
-      .slice(minLine(), maxLine())
-      .map((item) => item.line)
-      .join('\n');
-    const highlighter = await loadHighlighter();
-    const fileExtension = props.fileName.split(/[#?]/)[0]!.split('.').pop()?.trim();
-    // Only these grammars are loaded — anything else would make shiki
-    // throw. Fall back to plain JS highlighting for unknown sources.
-    let lang: 'js' | 'jsx' | 'ts' | 'tsx' = 'js';
-    if (
-      fileExtension === 'jsx' ||
-      fileExtension === 'ts' ||
-      fileExtension === 'tsx' ||
-      fileExtension === 'js'
-    ) {
-      lang = fileExtension;
-    }
-    return highlighter.codeToHtml(value, {
-      theme: 'dark-plus',
-      lang,
+    return highlighterFor(props.fileName)(source, {
+      line_numbers: { start: minLine() + 1 },
     });
   });
 
-  createEffect(
-    () => data(),
-    (result) => {
-      if (ref && result) {
-        ref.innerHTML = result;
-
-        const lines = ref.querySelectorAll('span[class="line"]');
-
-        for (let i = 0, len = lines.length; i < len; i++) {
-          const el = lines[i] as HTMLElement;
-          if (props.line - minLine() - 1 === i) {
-            el.dataset.solidErrorViewerErrorLine = '';
-          }
-        }
-      }
-    },
-  );
-
-  return (
-    <div
-      ref={ref}
-      data-solid-error-viewer-code-view
-      style={{
-        '--error-viewer-code-view-start': minLine() + 1,
-      }}
-    />
-  );
+  return <div data-solid-error-viewer-code-view innerHTML={html()} />;
 }

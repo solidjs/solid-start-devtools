@@ -246,27 +246,35 @@
   height: 100%;
 }
 
-[data-solid-error-viewer-code-view] > .shiki {
+[data-solid-error-viewer-code-view] > .twinkleplop {
   float: left;
   min-width: 100%;
   overflow-x: auto;
+  margin: 0;
   font-size: 0.75rem;
   line-height: 1rem;
-  counter-reset: step;
-  counter-increment: step calc(var(--error-viewer-code-view-start, 1) - 1);
-  background-color: transparent !important;
+  background-color: transparent;
 }
 
-[data-solid-error-viewer-code-view] > .shiki .line::before {
-  content: counter(step);
-  counter-increment: step;
-  width: 1rem;
-  margin-right: 1.5rem;
+/* The highlighter numbers the lines, so the panel only has to place them. */
+[data-solid-error-viewer-code-view] .ln {
   display: inline-block;
+  width: 2.5rem;
+  margin-right: 1rem;
   text-align: right;
   color: rgba(115, 138, 148, 0.4);
 }
 
-[data-solid-error-viewer-error-line] {
+/* The `hl` directive marks the line the frame points at. */
+[data-solid-error-viewer-code-view] .l.highlight {
+  display: inline-block;
+  min-width: 100%;
   background-color: oklch(0.63 0.21 25 / 0.25);
+}
+
+/* The `err` directive marks the word inside it, when the frame has a column. */
+[data-solid-error-viewer-code-view] .tok.error {
+  border-radius: 0.125rem;
+  background-color: oklch(0.63 0.21 25 / 0.35);
+  box-shadow: 0 1px 0 0 oklch(0.63 0.21 25 / 0.9);
 }

@@ -41,6 +41,18 @@ test('captures client errors', async ({ page }) => {
   // Frames come from the parsed stack, so an empty list means the parser broke.
   const frames = page.locator('[data-solid-error-viewer-stack-frame]');
   await expect(frames.first()).toContainText('app.tsx');
+
+  // The source is highlighted, and the frame's line and word are marked by the
+  // directives the panel writes above the snippet.
+  const code = page.locator('[data-solid-error-viewer-code-view]').first();
+  await expect(code.locator('.twinkleplop')).toBeVisible();
+  await expect(code.locator('.l.highlight')).toHaveCount(1);
+  await expect(code.locator('.l.highlight')).toContainText('client boom');
+  await expect(code.locator('.tok.error')).toHaveCount(1);
+
+  // The markers themselves never reach the reader.
+  await expect(code).not.toContainText('[!hl');
+  await expect(code).not.toContainText('[!err');
 });
 
 test('shows server-function calls', async ({ page }) => {
