@@ -1,4 +1,4 @@
-import { transformAsync } from '@dom-expressions/compiler';
+import { transformAsync } from '@solidjs/compiler';
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'rolldown';
 import { dts } from 'rolldown-plugin-dts';
@@ -56,28 +56,6 @@ function css(server = false) {
   };
 }
 
-function assetUrl() {
-  return {
-    name: 'devtools-asset-url',
-    async resolveId(source, importer) {
-      if (!source.endsWith('?url')) return null;
-      const resolved = await this.resolve(source.slice(0, -4), importer, {
-        skipSelf: true,
-      });
-      return resolved ? `${resolved.id}?url` : null;
-    },
-    load(id) {
-      if (!id.endsWith('?url')) return null;
-      const referenceId = this.emitFile({
-        type: 'asset',
-        name: 'onig.wasm',
-        source: readFileSync(id.slice(0, -4)),
-      });
-      return `export default import.meta.ROLLDOWN_FILE_URL_${referenceId};`;
-    },
-  };
-}
-
 function packageVersion() {
   const version = JSON.parse(readFileSync(new URL('./package.json', import.meta.url))).version;
   return {
@@ -112,7 +90,7 @@ function config({ input, entryFileNames, chunkFileNames, generate, server = fals
       sourcemap: true,
     },
     external,
-    plugins: [css(server), assetUrl(), packageVersion(), solid(generate)],
+    plugins: [css(server), packageVersion(), solid(generate)],
   };
 }
 

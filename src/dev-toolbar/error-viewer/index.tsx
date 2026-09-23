@@ -172,6 +172,7 @@ function StackFramesContent(props: StackFramesContentProps) {
                             <CodeView
                               fileName={source.source}
                               line={source.line}
+                              column={source.column}
                               content={source.content}
                             />
                           </div>

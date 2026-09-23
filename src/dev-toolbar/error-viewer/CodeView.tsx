@@ -1,97 +1,49 @@
 // @refresh skip
-import { getSingletonHighlighterCore, type HighlighterCore } from 'shiki/core';
-import { createOnigurumaEngine } from 'shiki/engine/oniguruma';
-import langJS from 'shiki/langs/javascript.mjs';
-import langJSX from 'shiki/langs/jsx.mjs';
-import langTSX from 'shiki/langs/tsx.mjs';
-import langTS from 'shiki/langs/typescript.mjs';
-import url from 'shiki/onig.wasm?url';
-import darkPlus from 'shiki/themes/dark-plus.mjs';
-import { createEffect, createMemo } from 'solid-js';
+import { createEffect, createMemo, createSignal } from 'solid-js';
 import type { JSX } from '@solidjs/web';
-
-let HIGHLIGHTER: HighlighterCore;
-
-async function loadHighlighter() {
-  if (!HIGHLIGHTER) {
-    HIGHLIGHTER = await getSingletonHighlighterCore({
-      engine: createOnigurumaEngine(fetch(url)),
-      themes: [darkPlus],
-      langs: [langJS, langJSX, langTS, langTSX],
-    });
-  }
-  return HIGHLIGHTER;
-}
+import { codeToHtml } from './highlight.js';
+import '@twinkleplop/theme-github/dark';
 
 export interface CodeViewProps {
   fileName: string;
   content: string;
   line: number;
+  /** Column of the error, so the marker can point at one word instead of the line. */
+  column?: number;
 }
 
-const RANGE = 15;
+/**
+ * Lines kept on each side of the frame.
+ *
+ * The view scrolls about this far, so the snippet holds what the reader can
+ * scroll to and nothing beyond it.
+ */
+const RANGE = 25;
 
 export function CodeView(props: CodeViewProps): JSX.Element | null {
-  const lines = () =>
-    props.content.split('\n').map((item, index) => ({
-      index: index + 1,
-      line: item,
-    }));
+  const [element, setElement] = createSignal<HTMLDivElement>();
 
-  const minLine = () => Math.max(props.line - (1 + RANGE), 0);
-  const maxLine = () => Math.min(props.line + RANGE, lines().length - 1);
+  const html = createMemo(() =>
+    codeToHtml({
+      fileName: props.fileName,
+      content: props.content,
+      line: props.line,
+      column: props.column,
+      range: RANGE,
+    }),
+  );
 
-  let ref: HTMLDivElement | undefined;
-
-  const data = createMemo(async () => {
-    const value = lines()
-      .slice(minLine(), maxLine())
-      .map((item) => item.line)
-      .join('\n');
-    const highlighter = await loadHighlighter();
-    const fileExtension = props.fileName.split(/[#?]/)[0]!.split('.').pop()?.trim();
-    // Only these grammars are loaded — anything else would make shiki
-    // throw. Fall back to plain JS highlighting for unknown sources.
-    let lang: 'js' | 'jsx' | 'ts' | 'tsx' = 'js';
-    if (
-      fileExtension === 'jsx' ||
-      fileExtension === 'ts' ||
-      fileExtension === 'tsx' ||
-      fileExtension === 'js'
-    ) {
-      lang = fileExtension;
-    }
-    return highlighter.codeToHtml(value, {
-      theme: 'dark-plus',
-      lang,
-    });
-  });
-
+  // The frame can sit anywhere in the file, so the view opens on it. Scrolling
+  // the box itself leaves the page where it is.
   createEffect(
-    () => data(),
-    (result) => {
-      if (ref && result) {
-        ref.innerHTML = result;
-
-        const lines = ref.querySelectorAll('span[class="line"]');
-
-        for (let i = 0, len = lines.length; i < len; i++) {
-          const el = lines[i] as HTMLElement;
-          if (props.line - minLine() - 1 === i) {
-            el.dataset.solidErrorViewerErrorLine = '';
-          }
-        }
-      }
+    () => ({ view: element(), code: html() }),
+    ({ view }) => {
+      if (!view) return;
+      const focused = view.querySelector('.focus') as HTMLElement | null;
+      if (!focused) return;
+      view.scrollTop = Math.max(focused.offsetTop - view.clientHeight / 2, 0);
     },
   );
 
-  return (
-    <div
-      ref={ref}
-      data-solid-error-viewer-code-view
-      style={{
-        '--error-viewer-code-view-start': minLine() + 1,
-      }}
-    />
-  );
+  return <div ref={setElement} data-solid-error-viewer-code-view innerHTML={html()} />;
 }
