@@ -50,10 +50,18 @@ test('captures client errors', async ({ page }) => {
   await expect(code.locator('.l.focus')).toContainText('client boom');
   await expect(code.locator('.tok.error')).toHaveCount(1);
 
-  // The window is cut out of a whole highlighted file, so the lines outside it
-  // are gone while the code inside them still reads correctly.
-  await expect(code).not.toContainText('emitServerFunctionResponse');
-  await expect(code.locator('.tok.keyword').first()).toBeVisible();
+  // The view scrolls, so it holds the lines the reader can scroll to rather
+  // than a window cut around the frame.
+  await expect(code).toContainText('emitServerFunctionResponse');
+
+  // It opens on the frame instead of the top of the file.
+  expect(
+    await code.evaluate((view) => {
+      const focused = view.querySelector('.focus')!.getBoundingClientRect();
+      const box = view.getBoundingClientRect();
+      return focused.top >= box.top && focused.bottom <= box.bottom;
+    }),
+  ).toBe(true);
 
   // The markers themselves never reach the reader.
   await expect(code).not.toContainText('[!focus');
