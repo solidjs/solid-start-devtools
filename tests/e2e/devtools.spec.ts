@@ -46,12 +46,17 @@ test('captures client errors', async ({ page }) => {
   // directives the panel writes above the snippet.
   const code = page.locator('[data-solid-error-viewer-code-view]').first();
   await expect(code.locator('.twinkleplop')).toBeVisible();
-  await expect(code.locator('.l.highlight')).toHaveCount(1);
-  await expect(code.locator('.l.highlight')).toContainText('client boom');
+  await expect(code.locator('.l.focus')).toHaveCount(1);
+  await expect(code.locator('.l.focus')).toContainText('client boom');
   await expect(code.locator('.tok.error')).toHaveCount(1);
 
+  // The window is cut out of a whole highlighted file, so the lines outside it
+  // are gone while the code inside them still reads correctly.
+  await expect(code).not.toContainText('emitServerFunctionResponse');
+  await expect(code.locator('.tok.keyword').first()).toBeVisible();
+
   // The markers themselves never reach the reader.
-  await expect(code).not.toContainText('[!hl');
+  await expect(code).not.toContainText('[!focus');
   await expect(code).not.toContainText('[!err');
 });
 

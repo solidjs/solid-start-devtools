@@ -265,11 +265,17 @@
   color: rgba(115, 138, 148, 0.4);
 }
 
-/* The `hl` directive marks the line the frame points at. */
-[data-solid-error-viewer-code-view] .l.highlight {
+/* The `focus` directive marks the line the frame points at. */
+[data-solid-error-viewer-code-view] .l.focus {
   display: inline-block;
   min-width: 100%;
   background-color: oklch(0.63 0.21 25 / 0.25);
+}
+
+/* The highlighter tags the block when a line is in focus, so the lines around
+   it can step back without the panel tracking which line that is. */
+[data-solid-error-viewer-code-view] .has-focus .l:not(.focus) {
+  opacity: 0.65;
 }
 
 /* The `err` directive marks the word inside it, when the frame has a column. */
