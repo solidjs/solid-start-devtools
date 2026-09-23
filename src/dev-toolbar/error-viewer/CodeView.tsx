@@ -15,11 +15,10 @@ export interface CodeViewProps {
 /**
  * Lines kept on each side of the frame.
  *
- * The view scrolls, so anything the reader can scroll to has to be there. This
- * is far past the reach of the scrollbar and only stops a very large file from
- * putting every one of its lines in the page.
+ * The view scrolls about this far, so the snippet holds what the reader can
+ * scroll to and nothing beyond it.
  */
-const RANGE = 250;
+const RANGE = 25;
 
 export function CodeView(props: CodeViewProps): JSX.Element | null {
   const [element, setElement] = createSignal<HTMLDivElement>();
