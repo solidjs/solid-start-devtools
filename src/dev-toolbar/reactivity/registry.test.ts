@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   EMPTY_GRAPH,
   excludeReactiveOwner,
@@ -9,8 +9,14 @@ import {
   subscribeReactivityGraph,
 } from './registry.js';
 
-// This suite runs against the server build of solid-js, which ships no dev
-// hooks. It covers the path an app takes in production.
+// Covers the path an app takes in production, where solid-js ships no dev
+// hooks. The test runner resolves the development build, which has them, so
+// the suite takes them away.
+vi.mock('solid-js', async (original) => ({
+  ...(await original<typeof import('solid-js')>()),
+  DEV: undefined,
+}));
+
 describe('registry without the dev runtime', () => {
   it('reports that the graph is unavailable', () => {
     expect(isReactivityAvailable()).toBe(false);

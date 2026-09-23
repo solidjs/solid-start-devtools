@@ -326,6 +326,9 @@ test('mounts once and disposes', async ({ page }) => {
   await expect(page.locator('[data-solid-dev-toolbar]')).toHaveCount(0);
 });
 
+// The toolbar's server build only loads under the development condition, and
+// the test script runs Node with it. Without it solid-js loads its production
+// server build, which replaces every error message with a generic one.
 test('sets a 500 status for server render errors', async () => {
   const moduleUrl = pathToFileURL(path.join(root, 'dist/server.js')).href;
   const { DevToolbar } = await import(moduleUrl);
