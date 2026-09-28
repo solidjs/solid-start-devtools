@@ -16,6 +16,13 @@ const EFFECT_RENDER = 1;
 const EFFECT_USER = 2;
 const EFFECT_TRACKED = 3;
 
+/**
+ * Set on `_config` of nodes the runtime creates for its own wiring, such as the
+ * memo the hot reload wrapper puts between a component and its body. They are
+ * nobody's node, so the graph hides them and owner paths skip them.
+ */
+const CONFIG_PLUMBING = 1 << 25;
+
 /** How many nodes a single snapshot may contain. Anything past this is dropped. */
 const NODE_LIMIT = 600;
 
@@ -242,8 +249,21 @@ function isPlainOwner(node: RawNode): boolean {
   return '_parent' in node && !isComputed(node);
 }
 
+/** Nodes the runtime created for its own wiring. */
+function isPlumbing(node: RawNode): boolean {
+  return typeof node._config === 'number' && (node._config & CONFIG_PLUMBING) !== 0;
+}
+
+/**
+ * A store keeps one signal per property it hands out. Those carry a back
+ * reference to the store object they belong to; plain signals do not.
+ */
+function isStoreNode(node: RawNode): boolean {
+  return '_host' in node;
+}
+
 function kindOf(node: RawNode): ReactiveNodeKind {
-  if (!isComputed(node)) return node._isStoreNode ? 'store' : 'signal';
+  if (!isComputed(node)) return isStoreNode(node) ? 'store' : 'signal';
   switch (node._type) {
     case EFFECT_RENDER:
       return 'render-effect';
@@ -288,6 +308,7 @@ function ownerOf(node: RawNode): RawNode | undefined {
  * say nothing about where the node lives, so they show nothing.
  */
 function ownerLabel(owner: RawNode): string | undefined {
+  if (isPlumbing(owner)) return undefined;
   const component = owner._component?.name;
   if (typeof component === 'string') {
     const name = component.startsWith(REFRESH_PREFIX)
@@ -430,6 +451,7 @@ export function snapshotReactivityGraph(options?: SnapshotOptions): ReactiveGrap
     // Roots and components are scopes, not graph nodes. They still contribute
     // their name to the owner path of everything below them.
     if (isPlainOwner(node)) continue;
+    if (isPlumbing(node)) continue;
     if (isExcluded(node)) continue;
 
     const state = stateOf(node);
@@ -455,7 +477,8 @@ export function snapshotReactivityGraph(options?: SnapshotOptions): ReactiveGrap
       errored: (statusFlags & STATUS_ERROR) !== 0,
       uninitialized: (statusFlags & STATUS_UNINITIALIZED) !== 0,
       lazy: (flags & REACTIVE_LAZY) !== 0,
-      error: node._error,
+      // The runtime keeps rarely used state on a node extension.
+      error: node._x?._error,
       ownerPath: ownerPathOf(node),
       raw: node,
       owner: ownerOf(node),

@@ -1,4 +1,4 @@
-import { transformAsync } from '@dom-expressions/compiler';
+import { transformAsync } from '@solidjs/compiler';
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'rolldown';
 import { dts } from 'rolldown-plugin-dts';

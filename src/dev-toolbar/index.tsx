@@ -272,8 +272,14 @@ export function DevToolbar(props: DevToolbarProps) {
       <Errored
         fallback={(error) => {
           const err = error();
-          if (isServer) httpStatus(500);
-          queueMicrotask(() => pushError(err));
+          if (isServer) {
+            // A server render is pure: it reports the failure and never
+            // writes toolbar state. The client shows the error after hydration.
+            httpStatus(500);
+            console.error(err);
+          } else {
+            queueMicrotask(() => pushError(err));
+          }
           return <></>;
         }}
       >

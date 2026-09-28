@@ -10,6 +10,7 @@ import {
 } from './tree.js';
 
 const REACTIVE_DISPOSED = 1 << 6;
+const CONFIG_PLUMBING = 1 << 25;
 
 interface FakeOptions {
   name?: string;
@@ -18,6 +19,8 @@ interface FakeOptions {
   memo?: boolean;
   root?: boolean;
   disposed?: boolean;
+  /** Marks the owner as runtime wiring, like the hot reload wrapper's memo. */
+  plumbing?: boolean;
   value?: unknown;
   signals?: RawNode[];
   children?: RawNode[];
@@ -39,6 +42,7 @@ function owner(options: FakeOptions = {}): RawNode {
   if (options.effect !== undefined) node._type = options.effect;
   if (options.root) node._root = true;
   if (options.disposed) node._flags = REACTIVE_DISPOSED;
+  if (options.plumbing) node._config = CONFIG_PLUMBING;
   return node;
 }
 
@@ -207,6 +211,29 @@ describe('buildOwnershipTree visibility', () => {
     const second = owner({ component: 'Second', children: [shared] });
 
     expect(names(build([first, second]).nodes)).toEqual(['<First>', '<Shared>', '<Second>']);
+  });
+
+  // The hot reload wrapper puts an unnamed memo between a component's root and
+  // its body. It is runtime wiring, so the tree walks through it.
+  it('walks through runtime plumbing without a row or a folded scope', () => {
+    const body = owner({ component: 'Counter', signals: [signal('count', 0)] });
+    const plumbing = owner({
+      memo: true,
+      plumbing: true,
+      signals: [signal('wired', 1)],
+      children: [body],
+    });
+    const root = owner({ component: 'App', children: [plumbing] });
+
+    const folded = build([root]);
+    expect(names(folded.nodes)).toEqual(['<App>', '<Counter>']);
+    expect(folded.nodes[0]!.scopes).toEqual([]);
+    expect(folded.nodes[0]!.signals.map((entry) => entry.name)).toEqual(['wired']);
+    expect(folded.nodes[1]!.parentId).toBe(folded.nodes[0]!.id);
+
+    const every = build([root], { componentsOnly: false });
+    expect(names(every.nodes)).toEqual(['<App>', '<Counter>']);
+    expect(every.nodes.some((node) => node.owner === plumbing)).toBe(false);
   });
 });
 
