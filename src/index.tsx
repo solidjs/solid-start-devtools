@@ -1,7 +1,7 @@
 import { render } from '@solidjs/web';
 import { OBSERVE } from 'solid-js';
+import { connectCallRecords } from './dev-toolbar/functions/records.js';
 import {
-  callRecordToEvents,
   pushServerFunctionCall,
   type ServerFunctionCall,
 } from './dev-toolbar/functions/tracker.js';
@@ -12,22 +12,14 @@ let frame: number | undefined;
 
 export { DevToolbar, type DevToolbarProps, pushServerFunctionCall, type ServerFunctionCall };
 
-// The server-function panel is fed by the runtime's `"call"` record: one
-// per server-function call made from this page, delivered when the caller's
-// await settles, with the request as sent and the response as it arrived
-// beside it (`bodies: true` — without it the runtime clones nothing and
-// there would be no body to show). `OBSERVE` exists in development builds
-// only, which is the only place this module is loaded.
-let calls = 0;
-OBSERVE?.records.subscribe(
-  'call',
-  (event, live) => {
-    for (const call of callRecordToEvents(event, live, `${event.id}#${++calls}`)) {
-      pushServerFunctionCall(call);
-    }
-  },
-  { bodies: true },
-);
+// The server-function panel is fed by the runtime's records: a call shows
+// up when its request is handed to `fetch` (the `"request"` record) and
+// completes when the caller's await settles (the `"call"` record), with the
+// request as sent and the response as it arrived beside them (`bodies:
+// true` — without it the runtime clones nothing and there would be no body
+// to show). `OBSERVE` exists in development builds only, which is the only
+// place this module is loaded.
+if (OBSERVE) connectCallRecords(OBSERVE.records);
 
 export function mountDevToolbar(): () => void {
   if (dispose) return dispose;
