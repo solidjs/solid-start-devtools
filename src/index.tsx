@@ -1,6 +1,7 @@
 import { render } from '@solidjs/web';
-import * as serverFunctions from '@solidjs/web/server-functions';
+import { OBSERVE } from 'solid-js';
 import {
+  callRecordToEvents,
   pushServerFunctionCall,
   type ServerFunctionCall,
 } from './dev-toolbar/functions/tracker.js';
@@ -11,8 +12,22 @@ let frame: number | undefined;
 
 export { DevToolbar, type DevToolbarProps, pushServerFunctionCall, type ServerFunctionCall };
 
-const observe = Reflect.get(serverFunctions, 'observeServerFunctionCalls');
-if (typeof observe === 'function') observe(pushServerFunctionCall);
+// The server-function panel is fed by the runtime's `"call"` record: one
+// per server-function call made from this page, delivered when the caller's
+// await settles, with the request as sent and the response as it arrived
+// beside it (`bodies: true` — without it the runtime clones nothing and
+// there would be no body to show). `OBSERVE` exists in development builds
+// only, which is the only place this module is loaded.
+let calls = 0;
+OBSERVE?.records.subscribe(
+  'call',
+  (event, live) => {
+    for (const call of callRecordToEvents(event, live, `${event.id}#${++calls}`)) {
+      pushServerFunctionCall(call);
+    }
+  },
+  { bodies: true },
+);
 
 export function mountDevToolbar(): () => void {
   if (dispose) return dispose;
