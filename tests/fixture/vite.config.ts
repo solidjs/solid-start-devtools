@@ -1,4 +1,4 @@
-import { transformAsync } from '@dom-expressions/compiler';
+import { transformAsync } from '@solidjs/compiler';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 

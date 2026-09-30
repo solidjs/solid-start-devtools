@@ -52,17 +52,17 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@solidjs/web": "^2.0.0-rc.0",
-    "solid-js": "^2.0.0-rc.0"
+    "@solidjs/web": "^2.0.0-rc.13",
+    "solid-js": "^2.0.0-rc.13"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@changesets/cli": "^2.30.0",
-    "@dom-expressions/compiler": "^0.50.0-next.43",
     "@jridgewell/trace-mapping": "^0.3.31",
     "@playwright/test": "^1.62.1",
-    "@solidjs/vite-plugin": "3.0.0-next.35",
-    "@solidjs/web": "^2.0.0-rc.0",
+    "@solidjs/compiler": "2.0.0-rc.13",
+    "@solidjs/vite-plugin": "3.0.0-next.46",
+    "@solidjs/web": "^2.0.0-rc.13",
     "@types/node": "^24.0.0",
     "error-stack-parser-es": "^2.0.1",
     "html-to-image": "^1.11.13",
@@ -72,7 +72,7 @@
     "rolldown-plugin-dts": "^0.28.2",
     "seroval": "^1.6.0",
     "shiki": "^4.3.1",
-    "solid-js": "^2.0.0-rc.0",
+    "solid-js": "^2.0.0-rc.13",
     "terracotta": "2.0.0-next.9",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",

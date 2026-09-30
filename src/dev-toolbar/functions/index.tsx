@@ -161,6 +161,16 @@ interface ResponseViewerProps {
   response?: ServerFunctionResponse;
 }
 
+/**
+ * Why a request has no response: the fetch itself rejected, and the runtime's
+ * record carried the thrown value (`meta.error`). `undefined` while pending.
+ */
+function failureOf(request: ServerFunctionRequest): string | undefined {
+  const error = request.meta?.error;
+  if (error === undefined) return undefined;
+  return error instanceof Error ? error.message : String(error);
+}
+
 function convertResponseToEntries(response: Response) {
   return [
     ['OK', response.ok],
@@ -179,7 +189,12 @@ function ResponseViewer(props: ResponseViewerProps): JSX.Element {
         when={props.response}
         fallback={
           <Placeholder>
-            <Text options={{ size: 'xs' }}>Waiting for response.</Text>
+            <Show
+              when={failureOf(props.request)}
+              fallback={<Text options={{ size: 'xs' }}>Waiting for response.</Text>}
+            >
+              {(failure) => <Text options={{ size: 'xs' }}>{`Request failed: ${failure()}`}</Text>}
+            </Show>
           </Placeholder>
         }
       >
@@ -244,7 +259,15 @@ function ServerFunctionInstanceDetail(props: ServerFunctionInstanceDetailProps) 
           {props.value.request.meta?.name ?? props.value.request.id}
         </Text>
       </span>
-      <Show when={props.value.response} keyed>
+      <Show
+        when={props.value.response}
+        keyed
+        fallback={
+          <Show when={failureOf(props.value.request) !== undefined}>
+            <Badge type="failure">ERR</Badge>
+          </Show>
+        }
+      >
         {(response) => {
           if (response.source.ok) {
             return <Badge type="success">{response.source.status}</Badge>;

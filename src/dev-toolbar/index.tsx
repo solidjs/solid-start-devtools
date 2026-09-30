@@ -1,6 +1,6 @@
 import type { JSX } from '@solidjs/web';
 import { clientOnly, httpStatus, isServer, Portal } from '@solidjs/web';
-import { createEffect, createSignal, Errored, getOwner, onSettled } from 'solid-js';
+import { createEffect, createSignal, Errored, getOwner, OBSERVE, onSettled } from 'solid-js';
 import { Toolbar } from 'terracotta/toolbar';
 import version from '../version.js';
 import IconButton from '../ui/IconButton.js';
@@ -28,14 +28,21 @@ function AppScope(props: { children?: JSX.Element }): JSX.Element {
   const owner = getOwner();
   includeReactiveOwner(owner);
   includeOwner(owner);
+  // The runtime's observe layer answers by the nearest marked ancestor: the
+  // toolbar excluded its root above, so the app is handed back here.
+  if (owner) OBSERVE?.include(owner);
   return <>{props.children}</>;
 }
 
 export function DevToolbar(props: DevToolbarProps) {
-  // Everything the toolbar creates stays out of the graph and the tree it renders.
+  // Everything the toolbar creates stays out of the graph and the tree it renders —
+  // and out of the runtime's own observe layer (diagnostics, attribution, the
+  // performance tracks), so the toolbar's signals and effects are never reported
+  // as the app's.
   const owner = getOwner();
   excludeReactiveOwner(owner);
   excludeOwner(owner);
+  if (owner) OBSERVE?.exclude(owner);
 
   const [ref, setRef] = createSignal<HTMLElement>();
 
@@ -272,8 +279,14 @@ export function DevToolbar(props: DevToolbarProps) {
       <Errored
         fallback={(error) => {
           const err = error();
-          if (isServer) httpStatus(500);
-          queueMicrotask(() => pushError(err));
+          if (isServer) {
+            // A server render is pure: it reports the failure and never
+            // writes toolbar state. The client shows the error after hydration.
+            httpStatus(500);
+            console.error(err);
+          } else {
+            queueMicrotask(() => pushError(err));
+          }
           return <></>;
         }}
       >

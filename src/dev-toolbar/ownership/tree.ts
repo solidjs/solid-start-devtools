@@ -1,11 +1,20 @@
 /** Raw owner or signal from the runtime. Only the fields the tree needs are read. */
 export type RawNode = Record<string, any>;
 
+// Flag bits used by @solidjs/signals. They are internal to the runtime, so the
+// values are copied here and every read is defensive.
 const REACTIVE_DISPOSED = 1 << 6;
 
 const EFFECT_RENDER = 1;
 const EFFECT_USER = 2;
 const EFFECT_TRACKED = 3;
+
+/**
+ * Set on `_config` of owners the runtime creates for its own wiring, such as
+ * the memo the hot reload wrapper puts between a component and its body. They
+ * are nobody's owner, so the tree walks through them without a row.
+ */
+const CONFIG_PLUMBING = 1 << 25;
 
 export type OwnerKind =
   | 'component'
@@ -162,6 +171,11 @@ function isDisposed(owner: RawNode): boolean {
   return typeof owner._flags === 'number' && (owner._flags & REACTIVE_DISPOSED) !== 0;
 }
 
+/** Owners the runtime created for its own wiring. */
+function isPlumbing(owner: RawNode): boolean {
+  return typeof owner._config === 'number' && (owner._config & CONFIG_PLUMBING) !== 0;
+}
+
 export interface BuildOptions {
   children(owner: RawNode): RawNode[];
   signals(owner: RawNode): RawNode[];
@@ -246,6 +260,14 @@ export function buildOwnershipTree(roots: RawNode[], options: BuildOptions): Own
     }
 
     if (isDisposed(owner) && !options.includeDisposed) return;
+
+    // Runtime wiring is nobody's owner. It never becomes a row or a folded
+    // scope, in either mode. Whatever it owns belongs to the owner above it.
+    if (isPlumbing(owner)) {
+      if (host) collectSignals(owner, host);
+      for (const child of options.children(owner)) walk(child, host, depth, false);
+      return;
+    }
 
     const shown = !options.componentsOnly || isComponent(owner);
 
