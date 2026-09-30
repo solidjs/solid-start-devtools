@@ -41,6 +41,32 @@ test('captures client errors', async ({ page }) => {
   // Frames come from the parsed stack, so an empty list means the parser broke.
   const frames = page.locator('[data-solid-error-viewer-stack-frame]');
   await expect(frames.first()).toContainText('app.tsx');
+
+  // The source is highlighted, and the frame's line and word are marked by the
+  // directives the panel writes above the snippet.
+  const code = page.locator('[data-solid-error-viewer-code-view]').first();
+  await expect(code.locator('.twinkleplop')).toBeVisible();
+  await expect(code.locator('.l.focus')).toHaveCount(1);
+  await expect(code.locator('.l.focus')).toContainText('client boom');
+  await expect(code.locator('.tok.error')).toHaveCount(1);
+
+  // The window around the frame is what the view scrolls through: lines near
+  // it are there, lines far from it are not.
+  await expect(code).toContainText('emitServerFunctionResponse');
+  await expect(code).not.toContainText('__disposeToolbar');
+
+  // It opens on the frame instead of the top of the file.
+  expect(
+    await code.evaluate((view) => {
+      const focused = view.querySelector('.focus')!.getBoundingClientRect();
+      const box = view.getBoundingClientRect();
+      return focused.top >= box.top && focused.bottom <= box.bottom;
+    }),
+  ).toBe(true);
+
+  // The markers themselves never reach the reader.
+  await expect(code).not.toContainText('[!focus');
+  await expect(code).not.toContainText('[!err');
 });
 
 test('shows server-function calls', async ({ page }) => {
