@@ -9,8 +9,14 @@
     "initial-release",
     "modern-toolchain",
     "native-oxc-toolchain",
+    "ownership-tree",
     "quiet-cats-smile",
+    "rc12-call-record-observe",
+    "rc12-runtime-parity",
+    "reactivity-graph",
     "safe-production-imports",
-    "toolbar-redesign"
+    "terracotta-next-9",
+    "toolbar-redesign",
+    "twinkleplop-highlighting"
   ]
 }
