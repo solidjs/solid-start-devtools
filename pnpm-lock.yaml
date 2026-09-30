@@ -30,16 +30,16 @@ importers:
         specifier: ^2.0.0-rc.13
         version: 2.0.0-rc.13(solid-js@2.0.0-rc.13)
       '@twinkleplop/annotation':
-        specifier: ^0.1.3
+        specifier: ^0.1.5
         version: 0.1.5
       '@twinkleplop/theme-github':
-        specifier: ^0.2.0
+        specifier: ^0.2.2
         version: 0.2.2
       '@twinkleplop/tsx':
-        specifier: ^0.1.3
+        specifier: ^0.1.5
         version: 0.1.5
       '@twinkleplop/typescript':
-        specifier: ^0.1.3
+        specifier: ^0.1.5
         version: 0.1.5
       '@types/node':
         specifier: ^24.0.0
