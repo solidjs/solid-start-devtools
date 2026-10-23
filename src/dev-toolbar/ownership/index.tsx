@@ -4,7 +4,7 @@ import { Badge } from '../../ui/Badge.js';
 import IconButton from '../../ui/IconButton.js';
 import Placeholder from '../../ui/Placeholder.js';
 import { Text } from '../../ui/Text.js';
-import { CollapseIcon, ExpandIcon, EyeIcon, PauseIcon, PlayIcon, TreeIcon } from '../icons.js';
+import { CollapseIcon, ExpandIcon, EyeIcon, PauseIcon, PlayIcon } from '../icons.js';
 import { previewValue, typeName } from './format.js';
 import {
   excludeOwner,
@@ -212,10 +212,6 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
       <div data-solid-dev-toolbar-panel>
         <div data-solid-ownership-viewer>
           <div data-solid-ownership-nav>
-            <div data-solid-ownership-nav-title>
-              <TreeIcon title="Ownership tree" />
-              <Text options={{ size: 'sm' }}>Ownership</Text>
-            </div>
             <input
               data-solid-ownership-search
               type="search"

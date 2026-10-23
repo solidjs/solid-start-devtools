@@ -8,7 +8,7 @@ import { Section } from '../../ui/Section.js';
 import { Select, SelectOption } from '../../ui/Select.js';
 import { Tab, TabGroup, TabList, TabPanel } from '../../ui/Tabs.js';
 import { Text } from '../../ui/Text.js';
-import { FunctionIcon, TrashIcon } from '../icons.js';
+import { TrashIcon } from '../icons.js';
 import { BlobViewer } from './BlobViewer.js';
 import { FormDataViewer } from './FormDataViewer.js';
 import { HeadersViewer } from './HeadersViewer.js';
@@ -349,8 +349,10 @@ export function ServerFunctionViewer(props: ServerFunctionViewerProps): JSX.Elem
           {/* list of calls */}
           <div data-solid-functions-sidebar>
             <div data-solid-functions-nav>
-              <FunctionIcon title="Server functions" />
-              <Text options={{ size: 'sm' }}>Server functions</Text>
+              <Text options={{ size: 'sm', font: 'sans' }}>Calls</Text>
+              <Text data-solid-functions-count options={{ size: 'xs', font: 'mono' }}>
+                {keys().length}
+              </Text>
             </div>
             <div data-solid-functions-instances-container>
               <Show when={keys().length} fallback={<EmptyServerFunctions />}>

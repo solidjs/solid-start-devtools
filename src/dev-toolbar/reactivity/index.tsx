@@ -4,7 +4,7 @@ import { Badge } from '../../ui/Badge.js';
 import IconButton from '../../ui/IconButton.js';
 import Placeholder from '../../ui/Placeholder.js';
 import { Text } from '../../ui/Text.js';
-import { FitIcon, GraphIcon, PauseIcon, PlayIcon } from '../icons.js';
+import { FitIcon, PauseIcon, PlayIcon } from '../icons.js';
 import { formatValue, typeName } from './format.js';
 import {
   ARROW_SIZE,
@@ -428,13 +428,9 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
 
   return (
     <Show when={props.show}>
-      <div data-solid-dev-toolbar-panel data-wide>
+      <div data-solid-dev-toolbar-panel>
         <div data-solid-reactivity-viewer>
           <div data-solid-reactivity-nav>
-            <div data-solid-reactivity-nav-title>
-              <GraphIcon title="Reactivity graph" />
-              <Text options={{ size: 'sm' }}>Reactivity graph</Text>
-            </div>
             <input
               data-solid-reactivity-search
               type="search"

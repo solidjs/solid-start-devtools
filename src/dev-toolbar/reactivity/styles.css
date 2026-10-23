@@ -27,16 +27,6 @@
   border-bottom: var(--start-dt-border-soft) 1px solid;
 }
 
-[data-solid-reactivity-nav-title] {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-
-  gap: 0.5rem;
-
-  flex-shrink: 0;
-}
-
 [data-solid-reactivity-nav-actions] {
   display: flex;
   flex-direction: row;
@@ -222,10 +212,11 @@
 
   padding: 0.25rem 0.5rem 0.25rem 0.625rem;
 
+  --start-dt-node-kind: var(--start-dt-kind-signal);
+
   border-radius: 0.625rem;
-  border: var(--start-dt-border) 1px solid;
-  border-left: var(--start-dt-kind-signal) 3px solid;
-  background: var(--start-dt-surface);
+  border: color-mix(in oklch, var(--start-dt-node-kind) 30%, var(--start-dt-border)) 1px solid;
+  background: color-mix(in oklch, var(--start-dt-node-kind) 8%, var(--start-dt-surface));
   color: var(--start-dt-text);
 
   text-align: left;
@@ -238,27 +229,27 @@
 }
 
 [data-solid-reactivity-node][data-kind='memo'] {
-  border-left-color: var(--start-dt-kind-memo);
+  --start-dt-node-kind: var(--start-dt-kind-memo);
 }
 
 [data-solid-reactivity-node][data-kind='effect'] {
-  border-left-color: var(--start-dt-kind-effect);
+  --start-dt-node-kind: var(--start-dt-kind-effect);
 }
 
 [data-solid-reactivity-node][data-kind='render-effect'] {
-  border-left-color: var(--start-dt-kind-render-effect);
+  --start-dt-node-kind: var(--start-dt-kind-render-effect);
 }
 
 [data-solid-reactivity-node][data-kind='tracked-effect'] {
-  border-left-color: var(--start-dt-kind-tracked-effect);
+  --start-dt-node-kind: var(--start-dt-kind-tracked-effect);
 }
 
 [data-solid-reactivity-node][data-kind='store'] {
-  border-left-color: var(--start-dt-kind-store);
+  --start-dt-node-kind: var(--start-dt-kind-store);
 }
 
 [data-solid-reactivity-node]:hover {
-  background: var(--start-dt-surface-hover);
+  background: color-mix(in oklch, var(--start-dt-node-kind) 16%, var(--start-dt-surface));
 }
 
 [data-solid-reactivity-node='muted'] {
@@ -312,6 +303,19 @@
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1rem;
+}
+
+[data-solid-reactivity-node-name]::before {
+  content: '';
+
+  display: inline-block;
+  width: 0.375rem;
+  height: 0.375rem;
+  margin-right: 0.375rem;
+  vertical-align: 0.0625rem;
+
+  border-radius: 9999px;
+  background: var(--start-dt-node-kind);
 }
 
 [data-solid-reactivity-node-value] {

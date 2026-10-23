@@ -28,16 +28,6 @@
   border-bottom: var(--start-dt-border-soft) 1px solid;
 }
 
-[data-solid-ownership-nav-title] {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-
-  gap: 0.5rem;
-
-  flex-shrink: 0;
-}
-
 [data-solid-ownership-nav-actions] {
   display: flex;
   flex-direction: row;

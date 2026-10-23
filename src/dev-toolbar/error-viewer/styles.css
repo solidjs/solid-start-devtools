@@ -170,11 +170,9 @@
 }
 
 [data-solid-error-viewer-stack-frame][tc-active],
-[data-solid-error-viewer-stack-frame][tc-selected],
-[data-solid-error-viewer-stack-frame]:focus {
+[data-solid-error-viewer-stack-frame][tc-selected] {
   color: var(--start-dt-text);
   background-color: var(--start-dt-accent-soft);
-  border-left-color: var(--start-dt-accent);
 }
 
 [data-solid-error-viewer-stack-frame-function] {
@@ -241,6 +239,8 @@
 }
 
 [data-solid-error-viewer-code-view] {
+  /* the offsetParent of the lines, so the view can scroll to the frame */
+  position: relative;
   overflow: auto;
   min-width: 100%;
   height: 100%;

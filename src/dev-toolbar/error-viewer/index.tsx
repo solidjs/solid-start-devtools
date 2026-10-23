@@ -4,7 +4,9 @@ import * as htmlToImage from 'html-to-image';
 import type { JSX } from '@solidjs/web';
 import { Errored, For, Loading, Show, createMemo, createSignal } from 'solid-js';
 import IconButton from '../../ui/IconButton.js';
+import Placeholder from '../../ui/Placeholder.js';
 import { Select, SelectOption } from '../../ui/Select.js';
+import { Text } from '../../ui/Text.js';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -276,55 +278,72 @@ export default function ErrorViewer(props: ErrorViewerProps): JSX.Element {
   return (
     <Show when={props.show}>
       <div data-solid-dev-toolbar-panel>
-        <div ref={setPanel} data-solid-error-viewer>
-          <div data-solid-error-viewer-navbar>
-            <div data-solid-error-viewer-navbar-left>
-              <Show when={props.errors.length > 1}>
-                <div data-solid-error-viewer-pagination>
-                  <IconButton data-solid-error-viewer-button onClick={goPrev} type="button">
-                    <ArrowLeftIcon title="Go Previous" />
-                  </IconButton>
-                  <div data-solid-error-viewer-page-counter>
-                    {`${truncated()} of ${props.errors.length}`}
+        <Show
+          when={props.errors.length}
+          fallback={
+            <Placeholder>
+              <Text options={{ size: 'xs' }}>No errors captured.</Text>
+            </Placeholder>
+          }
+        >
+          <div ref={setPanel} data-solid-error-viewer>
+            <div data-solid-error-viewer-navbar>
+              <div data-solid-error-viewer-navbar-left>
+                <Show when={props.errors.length > 1}>
+                  <div data-solid-error-viewer-pagination>
+                    <IconButton data-solid-error-viewer-button onClick={goPrev} type="button">
+                      <ArrowLeftIcon title="Go Previous" />
+                    </IconButton>
+                    <div data-solid-error-viewer-page-counter>
+                      {`${truncated()} of ${props.errors.length}`}
+                    </div>
+                    <IconButton data-solid-error-viewer-button onClick={goNext} type="button">
+                      <ArrowRightIcon title="Go Next" />
+                    </IconButton>
                   </div>
-                  <IconButton data-solid-error-viewer-button onClick={goNext} type="button">
-                    <ArrowRightIcon title="Go Next" />
-                  </IconButton>
-                </div>
-              </Show>
-            </div>
-            <div data-solid-error-viewer-controls>
-              <IconButton data-solid-error-viewer-button onClick={redirectToGithub} type="button">
-                <GithubIcon title="Create an issue thread on Github" />
-              </IconButton>
-              <IconButton data-solid-error-viewer-button onClick={redirectToDiscord} type="button">
-                <DiscordIcon title="Join our Discord Channel" />
-              </IconButton>
-              <IconButton data-solid-error-viewer-button onClick={downloadScreenshot} type="button">
-                <CameraIcon title="Capture Error Overlay" />
-              </IconButton>
-              <IconButton data-solid-error-viewer-button onClick={toggleIsCompiled} type="button">
-                <Show
-                  when={isCompiled()}
-                  fallback={<ViewOriginalIcon title="View Original Source" />}
-                >
-                  <ViewCompiledIcon title="View Compiled Source" />
                 </Show>
-              </IconButton>
-              <IconButton data-solid-error-viewer-button onClick={props.resetError} type="button">
-                <RefreshIcon title="Reset Error" />
-              </IconButton>
-            </div>
-          </div>
-          <Show when={props.errors[truncated() - 1]} keyed>
-            {(current) => (
-              <div data-solid-error-viewer-content>
-                <ErrorInfo error={current} />
-                <StackFrames error={current} isCompiled={isCompiled()} />
               </div>
-            )}
-          </Show>
-        </div>
+              <div data-solid-error-viewer-controls>
+                <IconButton data-solid-error-viewer-button onClick={redirectToGithub} type="button">
+                  <GithubIcon title="Create an issue thread on Github" />
+                </IconButton>
+                <IconButton
+                  data-solid-error-viewer-button
+                  onClick={redirectToDiscord}
+                  type="button"
+                >
+                  <DiscordIcon title="Join our Discord Channel" />
+                </IconButton>
+                <IconButton
+                  data-solid-error-viewer-button
+                  onClick={downloadScreenshot}
+                  type="button"
+                >
+                  <CameraIcon title="Capture Error Overlay" />
+                </IconButton>
+                <IconButton data-solid-error-viewer-button onClick={toggleIsCompiled} type="button">
+                  <Show
+                    when={isCompiled()}
+                    fallback={<ViewOriginalIcon title="View Original Source" />}
+                  >
+                    <ViewCompiledIcon title="View Compiled Source" />
+                  </Show>
+                </IconButton>
+                <IconButton data-solid-error-viewer-button onClick={props.resetError} type="button">
+                  <RefreshIcon title="Reset Error" />
+                </IconButton>
+              </div>
+            </div>
+            <Show when={props.errors[truncated() - 1]} keyed>
+              {(current) => (
+                <div data-solid-error-viewer-content>
+                  <ErrorInfo error={current} />
+                  <StackFrames error={current} isCompiled={isCompiled()} />
+                </div>
+              )}
+            </Show>
+          </div>
+        </Show>
       </div>
     </Show>
   );

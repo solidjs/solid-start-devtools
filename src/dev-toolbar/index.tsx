@@ -1,13 +1,21 @@
 import type { JSX } from '@solidjs/web';
 import { clientOnly, httpStatus, isServer, Portal } from '@solidjs/web';
-import { createEffect, createSignal, Errored, getOwner, OBSERVE, onSettled } from 'solid-js';
-import { Toolbar } from 'terracotta/toolbar';
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  Errored,
+  For,
+  getOwner,
+  OBSERVE,
+  onSettled,
+  Show,
+} from 'solid-js';
 import version from '../version.js';
 import IconButton from '../ui/IconButton.js';
-import { Text } from '../ui/Text.js';
 import { type ServerFunctionInstance, ServerFunctionViewer } from './functions/index.js';
 import { captureServerFunctionCall } from './functions/tracker.js';
-import { ErrorIcon, FunctionIcon, GraphIcon, SolidIcon, TreeIcon } from './icons.js';
+import { ErrorIcon, FunctionIcon, GraphIcon, MinimizeIcon, SolidIcon, TreeIcon } from './icons.js';
 import { excludeOwner, includeOwner } from './ownership/registry.js';
 import { excludeReactiveOwner, includeReactiveOwner } from './reactivity/registry.js';
 import './index.css';
@@ -15,6 +23,54 @@ import './index.css';
 const ErrorViewer = clientOnly(() => import('./error-viewer/index.js'), { lazy: true });
 const ReactivityViewer = clientOnly(() => import('./reactivity/index.js'), { lazy: true });
 const OwnershipViewer = clientOnly(() => import('./ownership/index.js'), { lazy: true });
+
+type Tab = 'err' | 'fn' | 'rx' | 'own';
+
+const TABS: { value: Tab; label: string; icon: typeof ErrorIcon }[] = [
+  { value: 'err', label: 'Errors', icon: ErrorIcon },
+  { value: 'fn', label: 'Server functions', icon: FunctionIcon },
+  { value: 'rx', label: 'Reactivity', icon: GraphIcon },
+  { value: 'own', label: 'Ownership', icon: TreeIcon },
+];
+
+// The dock remembers whether it was open, its tab and its height, so a full
+// reload during development comes back to the same view.
+const STORAGE_KEY = 'solid-start-devtools:dock';
+const MIN_HEIGHT = 160;
+const DEFAULT_HEIGHT = 360;
+// How far the pull tab moves up before a press becomes a drag that opens the dock.
+const DRAG_THRESHOLD = 4;
+
+interface DockState {
+  open: boolean;
+  tab: Tab;
+  height: number;
+}
+
+function readDockState(): Partial<DockState> {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<DockState>;
+  } catch {
+    // Storage can be blocked. The defaults stay.
+    return {};
+  }
+}
+
+function writeDockState(state: DockState): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Storage can be blocked.
+  }
+}
+
+function clampHeight(height: number): number {
+  return Math.round(Math.min(Math.max(height, MIN_HEIGHT), window.innerHeight * 0.9));
+}
+
+function currentRoute(): string {
+  return location.pathname + location.search;
+}
 
 export interface DevToolbarProps {
   children?: JSX.Element;
@@ -44,127 +100,123 @@ export function DevToolbar(props: DevToolbarProps) {
   excludeOwner(owner);
   if (owner) OBSERVE?.exclude(owner);
 
-  const [ref, setRef] = createSignal<HTMLElement>();
+  const [open, setOpen] = createSignal(false);
+  const [tab, setTab] = createSignal<Tab>('fn');
+  const [height, setHeight] = createSignal(DEFAULT_HEIGHT);
+  const [route, setRoute] = createSignal('');
 
+  // Writes are batched, so a signal read right after its setter still returns
+  // the old value. The caller passes what it just changed.
+  function persist(next: Partial<DockState>) {
+    writeDockState({ open: open(), tab: tab(), height: height(), ...next });
+  }
+
+  function show(value: Tab) {
+    setTab(value);
+    setOpen(true);
+    persist({ open: true, tab: value });
+  }
+
+  function close() {
+    setOpen(false);
+    persist({ open: false });
+  }
+
+  // A panel is live only while the dock is open on its tab, so the graph and
+  // the tree stop watching the app when nobody looks at them.
+  const visible = (value: Tab) => open() && tab() === value;
+
+  onSettled(() => {
+    const saved = readDockState();
+    if (TABS.some((entry) => entry.value === saved.tab)) setTab(saved.tab!);
+    if (typeof saved.height === 'number') setHeight(clampHeight(saved.height));
+    if (saved.open) setOpen(true);
+
+    // The Navigation API reports client-side navigations. Without it, only
+    // history traversal updates the route.
+    setRoute(currentRoute());
+    const updateRoute = () => setRoute(currentRoute());
+    const navigation = Reflect.get(window, 'navigation') as EventTarget | undefined;
+    window.addEventListener('popstate', updateRoute);
+    navigation?.addEventListener('currententrychange', updateRoute);
+    return () => {
+      window.removeEventListener('popstate', updateRoute);
+      navigation?.removeEventListener('currententrychange', updateRoute);
+    };
+  });
+
+  // The page can scroll past the open dock.
   createEffect(
-    () => ref(),
-    (current) => {
-      if (!current) return;
-
-      // Only the toolbar pill itself is the drag handle — panels/popovers are not draggable.
-      const handle =
-        (current.querySelector(':scope > [tc-toolbar]') as HTMLElement | null) ?? current;
-
-      let isDown = false;
-
-      let offsetX = 0;
-      let offsetY = 0;
-
-      let currentX = 0;
-      let currentY = 0;
-
-      let centerX = 0;
-      let centerY = 0;
-
-      const resetPosition = () => {
-        current.style.top = 'auto';
-        current.style.left = 'auto';
-        current.style.bottom = 'auto';
-        current.style.right = 'auto';
-      };
-
-      let isDirty = false;
-
-      const ac = new AbortController();
-
-      handle.addEventListener(
-        'mousedown',
-        (e) => {
-          isDown = true;
-
-          const rect = current.getBoundingClientRect();
-
-          currentX = rect.left;
-          currentY = rect.top;
-
-          offsetX = e.clientX - currentX;
-          offsetY = e.clientY - currentY;
-
-          centerX = rect.width / 2;
-          centerY = rect.height / 2;
-
-          isDirty = true;
-        },
-        {
-          signal: ac.signal,
-        },
-      );
-
-      window.addEventListener(
-        'mouseup',
-        () => {
-          if (isDown && !isDirty) {
-            const preferredAnchorX = currentX + centerX < window.innerWidth / 2 ? 'left' : 'right';
-            const preferredAnchorY = currentY + centerY < window.innerHeight / 2 ? 'top' : 'bottom';
-
-            resetPosition();
-
-            current.style[preferredAnchorX] = '0px';
-            current.style[preferredAnchorY] = '0px';
-
-            current.style.flexDirection =
-              preferredAnchorY === 'bottom' ? 'column-reverse' : 'column';
-            current.style.alignItems = preferredAnchorX === 'left' ? 'flex-start' : 'flex-end';
-          }
-          isDown = false;
-        },
-        {
-          signal: ac.signal,
-        },
-      );
-
-      window.addEventListener(
-        'mousemove',
-        (e) => {
-          if (isDown) {
-            if (isDirty) {
-              resetPosition();
-              isDirty = false;
-            }
-            currentX = e.clientX - offsetX;
-            currentY = e.clientY - offsetY;
-
-            current.style.left = `${currentX}px`;
-            current.style.top = `${currentY}px`;
-          }
-        },
-        {
-          signal: ac.signal,
-          passive: true,
-        },
-      );
-
+    () => (open() ? height() : undefined),
+    (value) => {
+      if (value === undefined) return;
+      const root = document.documentElement;
+      const previous = root.style.paddingBottom;
+      root.style.paddingBottom = `${value}px`;
       return () => {
-        ac.abort();
+        root.style.paddingBottom = previous;
       };
     },
   );
 
-  const [content, setContent] = createSignal<'fn' | 'err' | 'rx' | 'own' | undefined>(undefined);
+  // Dragging the top edge of the dock sets its height. Dragging the pull tab up
+  // does the same once it passes the threshold, opening the dock under the
+  // pointer. A press on the tab that never moves is left to its click.
+  function onDragHeight(event: PointerEvent, opening: boolean) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const start = event.clientY;
+    let dragging = !opening;
+    let last = height();
+    const move = (next: PointerEvent) => {
+      if (!dragging) {
+        if (start - next.clientY < DRAG_THRESHOLD) return;
+        dragging = true;
+        setOpen(true);
+      }
+      last = clampHeight(window.innerHeight - next.clientY);
+      setHeight(last);
+    };
+    // The tab hides as the dock opens, so the pointer is followed on the window.
+    const end = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      if (dragging) persist({ open: true, height: last });
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  }
+
+  onSettled(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      // `code`, because Alt changes the character `key` reports on macOS.
+      if (!event.altKey || !event.shiftKey || event.code !== 'KeyD') return;
+      event.preventDefault();
+      if (open()) close();
+      else show(tab());
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
+
+  function onTabKeyDown(event: KeyboardEvent) {
+    const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const index = TABS.findIndex((entry) => entry.value === tab());
+    const next = TABS[(index + step + TABS.length) % TABS.length]!;
+    show(next.value);
+    const list = event.currentTarget as HTMLElement;
+    list.querySelector<HTMLElement>(`[data-solid-dev-toolbar-tab="${next.value}"]`)?.focus();
+  }
 
   // A panel can ask the graph to show a node. Each request is a new object, so
   // asking for the same node twice still moves the view.
   const [graphFocus, setGraphFocus] = createSignal<{ node: object }>();
   // The graph can ask the ownership tree to show an owner the same way.
   const [ownershipFocus, setOwnershipFocus] = createSignal<{ owner: object }>();
-
-  function toggleContent(value: 'fn' | 'err' | 'rx' | 'own') {
-    if (content() === value) {
-      setContent(undefined);
-    } else {
-      setContent(value);
-    }
-  }
 
   const [errors, setErrors] = createSignal<unknown[]>([]);
 
@@ -176,7 +228,7 @@ export function DevToolbar(props: DevToolbarProps) {
     console.error(error);
     setErrors((current) => [error, ...current]);
 
-    setContent('err');
+    show('err');
   }
 
   onSettled(() => {
@@ -218,62 +270,155 @@ export function DevToolbar(props: DevToolbarProps) {
     }),
   );
 
+  const callCount = createMemo(() => Object.keys(instances()).length);
+
+  const badge = (value: Tab): number => {
+    if (value === 'err') return errors().length;
+    if (value === 'fn') return callCount();
+    return 0;
+  };
+
   return (
     <>
       <Portal>
-        <div data-solid-dev-toolbar ref={setRef}>
-          <Toolbar>
-            <div>
-              <IconButton onClick={() => toggleContent('err')} disabled={errors().length === 0}>
-                <ErrorIcon title="View Errors" />
-              </IconButton>
-              <IconButton onClick={() => toggleContent('fn')}>
-                <FunctionIcon title="View Server Functions" />
-              </IconButton>
-              <IconButton onClick={() => toggleContent('rx')}>
-                <GraphIcon title="View Reactivity Graph" />
-              </IconButton>
-              <IconButton onClick={() => toggleContent('own')}>
-                <TreeIcon title="View Ownership Tree" />
+        <div data-solid-dev-toolbar data-open={open() ? '' : undefined}>
+          {/* The closed dock: a grip on the bottom edge that grows into a pull tab
+              on hover or focus, so it covers almost none of the page. */}
+          <button
+            type="button"
+            data-solid-dev-toolbar-handle
+            data-errors={errors().length ? '' : undefined}
+            aria-label={
+              errors().length
+                ? `Open Start Devtools, ${errors().length} errors`
+                : 'Open Start Devtools'
+            }
+            title="Start Devtools (Alt+Shift+D)"
+            hidden={open()}
+            onPointerDown={(event) => onDragHeight(event, true)}
+            onClick={() => show(tab())}
+          >
+            <span data-solid-dev-toolbar-handle-grip />
+            <span data-solid-dev-toolbar-handle-content>
+              {/* The logo's SVG ids would clash with the header's copy, and a
+                  hidden copy breaks the visible one, so only one renders. */}
+              <Show when={!open()}>
+                <SolidIcon title="" aria-hidden="true" />
+              </Show>
+              <span data-solid-dev-toolbar-version>{version}</span>
+              <Show when={errors().length}>
+                {(count) => <span data-solid-dev-toolbar-handle-errors>{count()}</span>}
+              </Show>
+              <MinimizeIcon title="" aria-hidden="true" data-solid-dev-toolbar-handle-chevron />
+            </span>
+          </button>
+          <div
+            data-solid-dev-toolbar-dock
+            role="region"
+            aria-label="Start Devtools"
+            hidden={!open()}
+            style={{ height: `${height()}px` }}
+          >
+            <div
+              data-solid-dev-toolbar-resize
+              title="Drag to resize"
+              onPointerDown={(event) => onDragHeight(event, false)}
+            />
+            <div data-solid-dev-toolbar-header>
+              <div data-solid-dev-toolbar-brand>
+                <Show when={open()}>
+                  <SolidIcon title="" aria-hidden="true" />
+                </Show>
+                <span>Start Devtools</span>
+              </div>
+              <span data-solid-dev-toolbar-version title="Start Devtools version">
+                {version}
+              </span>
+              <span data-solid-dev-toolbar-route title="Current route">
+                {route()}
+              </span>
+              <div data-solid-dev-toolbar-spacer />
+              <IconButton onClick={close}>
+                <MinimizeIcon title="Close Start Devtools" />
               </IconButton>
             </div>
-            <div>
-              <SolidIcon title="Start Devtools Version" />
-              <div data-solid-dev-toolbar-version>
-                <Text options={{ size: 'xs', weight: 'semibold', font: 'mono', wrap: 'nowrap' }}>
-                  {version}
-                </Text>
+            <div data-solid-dev-toolbar-main>
+              <div
+                data-solid-dev-toolbar-nav
+                role="tablist"
+                aria-orientation="vertical"
+                onKeyDown={onTabKeyDown}
+              >
+                <For each={TABS}>
+                  {(entry) => {
+                    const Icon = entry.icon;
+                    return (
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-label={entry.label}
+                        id={`solid-dev-toolbar-tab-${entry.value}`}
+                        aria-controls="solid-dev-toolbar-body"
+                        aria-selected={tab() === entry.value ? 'true' : 'false'}
+                        tabindex={tab() === entry.value ? 0 : -1}
+                        data-solid-dev-toolbar-tab={entry.value}
+                        onClick={() => show(entry.value)}
+                      >
+                        <Icon title="" aria-hidden="true" />
+                        <span data-solid-dev-toolbar-tab-label>{entry.label}</span>
+                        <Show when={badge(entry.value)}>
+                          {(count) => (
+                            <span
+                              data-solid-dev-toolbar-tab-badge={
+                                entry.value === 'err' ? 'failure' : undefined
+                              }
+                            >
+                              {count()}
+                            </span>
+                          )}
+                        </Show>
+                      </button>
+                    );
+                  }}
+                </For>
+              </div>
+              <div
+                data-solid-dev-toolbar-body
+                id="solid-dev-toolbar-body"
+                role="tabpanel"
+                aria-labelledby={`solid-dev-toolbar-tab-${tab()}`}
+              >
+                <ErrorViewer show={visible('err')} errors={errors()} resetError={resetError} />
+                <ReactivityViewer
+                  show={visible('rx')}
+                  focus={graphFocus()}
+                  onViewOwner={(owner) => {
+                    setOwnershipFocus({ owner });
+                    show('own');
+                  }}
+                />
+                <OwnershipViewer
+                  show={visible('own')}
+                  focus={ownershipFocus()}
+                  onViewInGraph={(node) => {
+                    setGraphFocus({ node });
+                    show('rx');
+                  }}
+                />
+                <ServerFunctionViewer
+                  show={visible('fn')}
+                  instances={instances()}
+                  onDeleteInstance={(value) => {
+                    setInstances((current) => {
+                      const next = { ...current };
+                      delete next[value];
+                      return next;
+                    });
+                  }}
+                />
               </div>
             </div>
-          </Toolbar>
-          <ErrorViewer show={content() === 'err'} errors={errors()} resetError={resetError} />
-          <ReactivityViewer
-            show={content() === 'rx'}
-            focus={graphFocus()}
-            onViewOwner={(owner) => {
-              setOwnershipFocus({ owner });
-              setContent('own');
-            }}
-          />
-          <OwnershipViewer
-            show={content() === 'own'}
-            focus={ownershipFocus()}
-            onViewInGraph={(node) => {
-              setGraphFocus({ node });
-              setContent('rx');
-            }}
-          />
-          <ServerFunctionViewer
-            show={content() === 'fn'}
-            instances={instances()}
-            onDeleteInstance={(value) => {
-              setInstances((current) => {
-                const next = { ...current };
-                delete next[value];
-                return next;
-              });
-            }}
-          />
+          </div>
         </div>
       </Portal>
       <Errored

@@ -13,6 +13,11 @@ Development error and server-function tooling for Solid Start mode.
 pnpm add @solidjs/start-devtools@next
 ```
 
+The toolbar is a dock at the bottom of the page. Closed, it is a small grip at the bottom
+center. Click it, drag it up, or press Alt+Shift+D to open it. Drag its top edge to change
+its height. It remembers whether it was open, its tab and its height across reloads, and an
+error opens it on the Errors tab.
+
 The Vite plugin mounts it automatically. Integrations can use the package directly:
 
 ```tsx

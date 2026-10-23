@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { createRequestEvent, renderToString } from '@solidjs/web';
 import { provideRequestEvent } from '@solidjs/web/storage';
 import { build } from 'vite';
@@ -23,6 +23,14 @@ async function readJavaScript(directory: string): Promise<string> {
   return sources.join('\n');
 }
 
+// Opens the dock on a tab. The dock sits below the page, which can scroll past
+// it, so the fixture stays clickable while it is open.
+async function openTab(page: Page, name: string) {
+  const launcher = page.getByRole('button', { name: 'Open Start Devtools' });
+  if (await launcher.isVisible()) await launcher.click();
+  await page.getByRole('tab', { name, exact: true }).click();
+}
+
 test('renders the toolbar around the app', async ({ page }) => {
   await page.goto('/');
 
@@ -30,9 +38,86 @@ test('renders the toolbar around the app', async ({ page }) => {
   await expect(page.locator('#fixture-content')).toHaveText('app content');
 });
 
+test('docks at the bottom of the page', async ({ page }) => {
+  await page.goto('/');
+  const dock = page.getByRole('region', { name: 'Start Devtools' });
+  await expect(dock).toBeHidden();
+
+  await page.getByRole('button', { name: 'Open Start Devtools' }).click();
+  await expect(dock).toBeVisible();
+  const box = (await dock.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(box.x).toBe(0);
+  expect(box.width).toBe(viewport.width);
+  expect(Math.round(box.y + box.height)).toBe(viewport.height);
+  // The page can scroll past the dock.
+  expect(await page.evaluate(() => document.documentElement.style.paddingBottom)).toBe(
+    `${box.height}px`,
+  );
+
+  // Dragging the top edge resizes it, and a reload keeps the height and the tab.
+  await page.getByRole('tab', { name: 'Ownership', exact: true }).click();
+  await page.mouse.move(viewport.width / 2, box.y + 1);
+  await page.mouse.down();
+  await page.mouse.move(viewport.width / 2, box.y - 100, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(async () => (await dock.boundingBox())!.height).toBe(box.height + 100);
+
+  await page.reload();
+  await expect(dock).toBeVisible();
+  await expect.poll(async () => (await dock.boundingBox())!.height).toBe(box.height + 100);
+  await expect(page.getByRole('tab', { name: 'Ownership', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+
+  await page.getByRole('button', { name: 'Close Start Devtools' }).click();
+  await expect(dock).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.style.paddingBottom)).toBe('');
+
+  // Closing is remembered too.
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Open Start Devtools' })).toBeVisible();
+  await expect(dock).toBeHidden();
+});
+
+test('opens the dock from its pull tab', async ({ page }) => {
+  await page.goto('/');
+  const dock = page.getByRole('region', { name: 'Start Devtools' });
+  const handle = page.getByRole('button', { name: 'Open Start Devtools' });
+  const viewport = page.viewportSize()!;
+
+  // Closed, the tab is a grip on the bottom edge that leaves the page alone.
+  const grip = (await handle.boundingBox())!;
+  expect(Math.round(grip.y + grip.height)).toBe(viewport.height);
+  expect(grip.height).toBeLessThan(16);
+  expect(await page.evaluate(() => document.documentElement.style.paddingBottom)).toBe('');
+
+  // Dragging it up opens the dock to where the pointer stops.
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height - 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, viewport.height - 300, { steps: 6 });
+  await page.mouse.up();
+  await expect(dock).toBeVisible();
+  await expect.poll(async () => (await dock.boundingBox())!.height).toBe(300);
+  await expect(handle).toBeHidden();
+
+  // Alt+Shift+D toggles it.
+  await page.keyboard.press('Alt+Shift+KeyD');
+  await expect(dock).toBeHidden();
+  await page.keyboard.press('Alt+Shift+KeyD');
+  await expect(dock).toBeVisible();
+});
+
 test('captures client errors', async ({ page }) => {
   await page.goto('/');
   await page.locator('#throw-client-error').click();
+
+  // An error opens the dock on its tab.
+  await expect(page.getByRole('tab', { name: 'Errors', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
 
   await expect(page.locator('[data-solid-error-viewer-error-info-message]')).toHaveText(
     'client boom',
@@ -76,23 +161,17 @@ test('shows server-function calls', async ({ page }) => {
   });
 
   await page.goto('/');
-  const toggle = page.getByRole('button', { name: 'View Server Functions' });
   const instances = page.locator('[data-solid-functions-instances]');
 
-  // The panel overlays the page, so the fixture buttons are only clickable
-  // while it is closed.
   await page.locator('#emit-server-function-request').click();
-  await toggle.click();
+  await openTab(page, 'Server functions');
   await expect(instances).toContainText('loadUser');
+  await expect(page.getByRole('tab', { name: 'Server functions' })).toContainText('1');
 
-  await toggle.click();
   await page.locator('#emit-server-function-response').click();
-  await toggle.click();
   await expect(instances).toContainText('201');
 
-  await toggle.click();
   await page.locator('#emit-server-function-response').click();
-  await toggle.click();
   await expect(instances).toContainText('500');
 
   // The detail pane starts empty and fills in once a call is selected.
@@ -106,11 +185,10 @@ test('shows server-function calls', async ({ page }) => {
 
 test('maps the reactivity graph', async ({ page }) => {
   await page.goto('/');
-  const toggle = page.getByRole('button', { name: 'View Reactivity Graph' });
   const nodes = page.locator('[data-solid-reactivity-node]');
   const count = nodes.filter({ hasText: /^count/ }).first();
 
-  await toggle.click();
+  await openTab(page, 'Reactivity');
   await expect(count).toBeVisible();
   await expect(nodes.filter({ hasText: /^doubled/ }).first()).toBeVisible();
   await expect(nodes.filter({ hasText: /^report-doubled/ }).first()).toBeVisible();
@@ -156,10 +234,7 @@ test('maps the reactivity graph', async ({ page }) => {
     'downstream',
   );
 
-  // The panel covers the page, so close it before driving the app.
-  await toggle.click();
   await page.locator('#increment-count').click();
-  await toggle.click();
   await expect(count).toContainText('1');
   await expect(nodes.filter({ hasText: /^doubled/ }).first()).toContainText('2');
 
@@ -197,10 +272,9 @@ test('maps the reactivity graph', async ({ page }) => {
 
 test('maps the ownership tree', async ({ page }) => {
   await page.goto('/');
-  const toggle = page.getByRole('button', { name: 'View Ownership Tree' });
   const rows = page.locator('[data-solid-ownership-name]');
 
-  await toggle.click();
+  await openTab(page, 'Ownership');
   await expect(rows).toHaveText(['<App>', '<Greeting>', '<Counter>', '<Show>']);
 
   // The expand arrow keeps its full size inside the button.
@@ -299,7 +373,7 @@ test('maps the ownership tree', async ({ page }) => {
   ).toContainText('2');
 
   // In owner mode a memo is a row of its own, and its heading links to the graph.
-  await toggle.click();
+  await openTab(page, 'Ownership');
   await page.getByRole('button', { name: 'Owners', exact: true }).click();
   await page
     .locator('[data-solid-ownership-label]')

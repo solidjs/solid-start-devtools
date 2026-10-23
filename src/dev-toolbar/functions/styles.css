@@ -131,9 +131,9 @@
   flex-shrink: 0;
 }
 
-[data-solid-functions-nav] svg {
-  padding: 0.25rem;
-  color: var(--start-dt-accent);
+[data-solid-functions-count] {
+  margin-left: auto;
+  color: var(--start-dt-text-muted);
 }
 
 [data-solid-function-instance-viewer-nav] > div:last-child {

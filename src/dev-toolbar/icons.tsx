@@ -661,3 +661,23 @@ export function EyeIcon(props: JSX.IntrinsicElements['svg'] & { title: string })
     </svg>
   );
 }
+
+export function MinimizeIcon(props: JSX.IntrinsicElements['svg'] & { title: string }): JSX.Element {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      {...props}
+    >
+      <title>{props.title}</title>
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1.6"
+        d="m19.5 8.25-7.5 7.5-7.5-7.5"
+      />
+    </svg>
+  );
+}

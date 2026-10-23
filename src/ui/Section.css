@@ -47,11 +47,7 @@ summary[data-solid-section-title]:hover {
 }
 
 [data-solid-section-content] {
-  margin-left: 0.25rem;
-  padding-left: 0.625rem;
-  border-left: 2px var(--start-dt-border-soft, oklch(87% 0.065 274.039)) solid;
-
-  width: calc(100% - 2rem);
+  width: 100%;
 
   overflow: auto;
 }
