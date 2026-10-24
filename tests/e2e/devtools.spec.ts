@@ -448,15 +448,15 @@ test('maps the ownership tree', async ({ page }) => {
   ).toHaveAttribute('data-solid-reactivity-node', 'selected');
 });
 
-test('lists runtime warnings', async ({ page }) => {
+test('lists runtime issues', async ({ page }) => {
   await page.goto('/');
 
   // Each render of the reader reports the same untracked read.
   for (let i = 0; i < 3; i++) await page.locator('#emit-warning').click();
-  await openTab(page, 'Warnings');
-  await expect(page.getByRole('tab', { name: 'Warnings', exact: true })).toContainText('2');
+  await openTab(page, 'Issues');
+  await expect(page.getByRole('tab', { name: 'Issues', exact: true })).toContainText('2');
 
-  const rows = page.locator('[data-solid-warnings-row]');
+  const rows = page.locator('[data-solid-issues-row]');
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('STRICT_READ_UNTRACKED');
   await expect(rows.first()).toContainText('×2');
@@ -465,13 +465,13 @@ test('lists runtime warnings', async ({ page }) => {
   await expect(rows.first()).not.toContainText('<DevToolbar>');
 
   // The severity filter hides it.
-  await page.locator('[data-solid-warnings-filter="warn"]').click();
+  await page.locator('[data-solid-issues-filter="warn"]').click();
   await expect(rows).toHaveCount(0);
-  await page.locator('[data-solid-warnings-filter="warn"]').click();
+  await page.locator('[data-solid-issues-filter="warn"]').click();
 
   // The detail links to the component in the ownership tree.
   await rows.first().click();
-  const detail = page.locator('[data-solid-warnings-detail]');
+  const detail = page.locator('[data-solid-issues-detail]');
   await expect(detail).toContainText('draft');
   await expect(detail.getByRole('link', { name: 'Open the repair guide' })).toHaveAttribute(
     'href',
@@ -483,10 +483,10 @@ test('lists runtime warnings', async ({ page }) => {
   );
 
   // Clearing empties the list and the count.
-  await openTab(page, 'Warnings');
-  await page.getByRole('button', { name: 'Clear warnings' }).click();
+  await openTab(page, 'Issues');
+  await page.getByRole('button', { name: 'Clear issues' }).click();
   await expect(rows).toHaveCount(0);
-  await expect(page.getByRole('tab', { name: 'Warnings', exact: true })).not.toContainText('2');
+  await expect(page.getByRole('tab', { name: 'Issues', exact: true })).not.toContainText('2');
 });
 
 test('copies reports for an agent', async ({ page, context }) => {

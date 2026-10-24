@@ -7,16 +7,11 @@ import { Text } from '../../ui/Text.js';
 import { EyeIcon, TrashIcon, TreeIcon } from '../icons.js';
 import { CopyReportButton } from '../report/CopyReportButton.js';
 import { pageRoute } from '../report/markdown.js';
-import { warningReport } from '../report/warning-report.js';
-import {
-  isWarningsAvailable,
-  warningText,
-  type WarningEntry,
-  type WarningEvent,
-} from './tracker.js';
+import { issueReport } from '../report/issue-report.js';
+import { isIssuesAvailable, issueText, type IssueEntry, type IssueEvent } from './tracker.js';
 import './styles.css';
 
-type Severity = WarningEvent['severity'];
+type Severity = IssueEvent['severity'];
 
 const SEVERITIES: { value: Severity; label: string }[] = [
   { value: 'error', label: 'Errors' },
@@ -64,9 +59,9 @@ function time(at: number): string {
   return new Date(at).toLocaleTimeString();
 }
 
-export interface WarningsViewerProps {
+export interface IssuesViewerProps {
   show?: boolean;
-  entries: WarningEntry[];
+  entries: IssueEntry[];
   onClear: () => void;
   /** Opens the owner of a finding in the ownership tree. */
   onViewOwner?: (owner: object) => void;
@@ -74,7 +69,7 @@ export interface WarningsViewerProps {
   onViewInGraph?: (node: object) => void;
 }
 
-export default function WarningsViewer(props: WarningsViewerProps): JSX.Element {
+export default function IssuesViewer(props: IssuesViewerProps): JSX.Element {
   const [query, setQuery] = createSignal('');
   const [hidden, setHidden] = createSignal<Severity[]>([]);
   const [selected, setSelected] = createSignal<string>();
@@ -106,21 +101,21 @@ export default function WarningsViewer(props: WarningsViewerProps): JSX.Element 
   return (
     <Show when={props.show}>
       <div data-solid-dev-toolbar-panel>
-        <div data-solid-warnings-viewer>
-          <div data-solid-warnings-nav>
+        <div data-solid-issues-viewer>
+          <div data-solid-issues-nav>
             <input
-              data-solid-warnings-search
+              data-solid-issues-search
               type="search"
               placeholder="Filter by code, message or owner"
               value={query()}
               onInput={(event) => setQuery(event.currentTarget.value)}
             />
-            <div data-solid-warnings-filters>
+            <div data-solid-issues-filters>
               <For each={SEVERITIES}>
                 {(severity) => (
                   <button
                     type="button"
-                    data-solid-warnings-filter={severity.value}
+                    data-solid-issues-filter={severity.value}
                     data-off={hidden().includes(severity.value) ? '' : undefined}
                     aria-pressed={hidden().includes(severity.value) ? 'false' : 'true'}
                     onClick={() => toggleSeverity(severity.value)}
@@ -132,8 +127,8 @@ export default function WarningsViewer(props: WarningsViewerProps): JSX.Element 
                 )}
               </For>
             </div>
-            <div data-solid-warnings-nav-actions>
-              <Text data-solid-warnings-count options={{ size: 'xs', font: 'mono' }}>
+            <div data-solid-issues-nav-actions>
+              <Text data-solid-issues-count options={{ size: 'xs', font: 'mono' }}>
                 {`${shown().length} of ${props.entries.length}`}
               </Text>
               <IconButton
@@ -143,23 +138,21 @@ export default function WarningsViewer(props: WarningsViewerProps): JSX.Element 
                   props.onClear();
                 }}
               >
-                <TrashIcon title="Clear warnings" />
+                <TrashIcon title="Clear issues" />
               </IconButton>
             </div>
           </div>
 
-          <div data-solid-warnings-body>
+          <div data-solid-issues-body>
             <Show
-              when={isWarningsAvailable()}
+              when={isIssuesAvailable()}
               fallback={
                 <Placeholder>
-                  <Text options={{ size: 'xs' }}>
-                    Warnings need a development build of solid-js.
-                  </Text>
+                  <Text options={{ size: 'xs' }}>Issues need a development build of solid-js.</Text>
                 </Placeholder>
               }
             >
-              <div data-solid-warnings-list>
+              <div data-solid-issues-list>
                 <Show
                   when={shown().length}
                   fallback={
@@ -167,7 +160,7 @@ export default function WarningsViewer(props: WarningsViewerProps): JSX.Element 
                       <Text options={{ size: 'xs' }}>
                         {props.entries.length
                           ? 'Nothing matches this filter.'
-                          : 'No warnings from the runtime.'}
+                          : 'No issues reported by the runtime.'}
                       </Text>
                     </Placeholder>
                   }
@@ -176,29 +169,29 @@ export default function WarningsViewer(props: WarningsViewerProps): JSX.Element 
                     {(entry) => (
                       <button
                         type="button"
-                        data-solid-warnings-row
+                        data-solid-issues-row
                         data-severity={entry.event.severity}
                         data-selected={selected() === entry.key ? '' : undefined}
                         onClick={() =>
                           setSelected((current) => (current === entry.key ? undefined : entry.key))
                         }
                       >
-                        <span data-solid-warnings-row-head>
+                        <span data-solid-issues-row-head>
                           <Badge type={BADGES[entry.event.severity]}>{entry.event.code}</Badge>
                           <Show when={entry.count > 1}>
-                            <span data-solid-warnings-row-count>{`×${entry.count}`}</span>
+                            <span data-solid-issues-row-count>{`×${entry.count}`}</span>
                           </Show>
                           <Show when={entry.event.ownerPath?.length}>
                             <Text
-                              data-solid-warnings-row-owner
+                              data-solid-issues-row-owner
                               options={{ size: 'xs', font: 'mono', wrap: 'nowrap' }}
                             >
                               {entry.event.ownerPath!.join(' › ')}
                             </Text>
                           </Show>
                         </span>
-                        <Text data-solid-warnings-row-message options={{ size: 'xs' }}>
-                          {warningText(entry.event)}
+                        <Text data-solid-issues-row-message options={{ size: 'xs' }}>
+                          {issueText(entry.event)}
                         </Text>
                       </button>
                     )}
@@ -211,8 +204,8 @@ export default function WarningsViewer(props: WarningsViewerProps): JSX.Element 
                   const subject = () => entry().subject?.deref();
                   const guide = () => guideUrl(entry().event.code);
                   return (
-                    <aside data-solid-warnings-detail>
-                      <div data-solid-warnings-detail-head>
+                    <aside data-solid-issues-detail>
+                      <div data-solid-issues-detail-head>
                         <Badge type={BADGES[entry().event.severity]}>
                           {entry().event.severity}
                         </Badge>
@@ -220,15 +213,15 @@ export default function WarningsViewer(props: WarningsViewerProps): JSX.Element 
                           {entry().event.code}
                         </Text>
                         <CopyReportButton
-                          label="this warning"
+                          label="this issue"
                           report={() =>
-                            warningReport({ entry: entry(), guideUrl: guide(), route: pageRoute() })
+                            issueReport({ entry: entry(), guideUrl: guide(), route: pageRoute() })
                           }
                         />
                       </div>
 
-                      <Text data-solid-warnings-detail-message options={{ size: 'xs' }}>
-                        {warningText(entry().event)}
+                      <Text data-solid-issues-detail-message options={{ size: 'xs' }}>
+                        {issueText(entry().event)}
                       </Text>
 
                       <div data-solid-kv-table>
@@ -274,12 +267,12 @@ export default function WarningsViewer(props: WarningsViewerProps): JSX.Element 
                         </div>
                       </div>
 
-                      <div data-solid-warnings-actions>
+                      <div data-solid-issues-actions>
                         <Show when={props.onViewOwner && subject()}>
                           {(current) => (
                             <button
                               type="button"
-                              data-solid-warnings-action
+                              data-solid-issues-action
                               onClick={() => props.onViewOwner?.(ownerOf(current()))}
                             >
                               <TreeIcon title="" aria-hidden="true" />
@@ -297,7 +290,7 @@ export default function WarningsViewer(props: WarningsViewerProps): JSX.Element 
                           {(current) => (
                             <button
                               type="button"
-                              data-solid-warnings-action
+                              data-solid-issues-action
                               onClick={() => props.onViewInGraph?.(current())}
                             >
                               <EyeIcon title="" aria-hidden="true" />
@@ -310,7 +303,7 @@ export default function WarningsViewer(props: WarningsViewerProps): JSX.Element 
                         <Show when={guide()}>
                           {(url) => (
                             <a
-                              data-solid-warnings-action
+                              data-solid-issues-action
                               href={url()}
                               target="_blank"
                               rel="noreferrer"
@@ -324,7 +317,7 @@ export default function WarningsViewer(props: WarningsViewerProps): JSX.Element 
                       </div>
 
                       <Show when={entry().event.data && Object.keys(entry().event.data!).length}>
-                        <div data-solid-warnings-data>
+                        <div data-solid-issues-data>
                           <Text options={{ size: 'xs', weight: 'semibold' }}>Data</Text>
                           <pre>
                             <Text options={{ size: 'xs', font: 'mono' }}>

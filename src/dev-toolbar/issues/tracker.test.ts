@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { warningReport } from '../report/warning-report.js';
-import { addWarnings, appOwnerPath, warningText, type WarningEvent } from './tracker.js';
+import { issueReport } from '../report/issue-report.js';
+import { addIssues, appOwnerPath, issueText, type IssueEvent } from './tracker.js';
 
-function finding(over: Partial<WarningEvent> = {}): WarningEvent {
+function finding(over: Partial<IssueEvent> = {}): IssueEvent {
   return {
     sequence: 1,
     code: 'STRICT_READ_UNTRACKED',
@@ -15,10 +15,10 @@ function finding(over: Partial<WarningEvent> = {}): WarningEvent {
   };
 }
 
-describe('warningText', () => {
+describe('issueText', () => {
   it('drops the code prefix the console needs', () => {
-    expect(warningText(finding())).toBe('Reactive value "draft" read directly in <Draft>.');
-    expect(warningText(finding({ message: 'plain' }))).toBe('plain');
+    expect(issueText(finding())).toBe('Reactive value "draft" read directly in <Draft>.');
+    expect(issueText(finding({ message: 'plain' }))).toBe('plain');
   });
 });
 
@@ -43,15 +43,15 @@ describe('appOwnerPath', () => {
   });
 });
 
-describe('addWarnings', () => {
+describe('addIssues', () => {
   it('counts equal findings as one entry and moves it to the top', () => {
     const first = {};
     const second = {};
-    let entries = addWarnings([], [{ event: finding(), subject: first, at: 1 }]);
-    entries = addWarnings(entries, [
+    let entries = addIssues([], [{ event: finding(), subject: first, at: 1 }]);
+    entries = addIssues(entries, [
       { event: finding({ code: 'NO_OWNER_EFFECT', message: 'other' }), subject: undefined, at: 2 },
     ]);
-    entries = addWarnings(entries, [{ event: finding({ sequence: 3 }), subject: second, at: 3 }]);
+    entries = addIssues(entries, [{ event: finding({ sequence: 3 }), subject: second, at: 3 }]);
 
     expect(entries.map((entry) => entry.event.code)).toEqual([
       'STRICT_READ_UNTRACKED',
@@ -65,7 +65,7 @@ describe('addWarnings', () => {
   });
 
   it('keeps findings in different owners apart', () => {
-    const entries = addWarnings(
+    const entries = addIssues(
       [],
       [
         { event: finding(), subject: undefined, at: 1 },
@@ -81,13 +81,13 @@ describe('addWarnings', () => {
       subject: undefined,
       at: n,
     }));
-    expect(addWarnings([], added, 2).map((entry) => entry.event.message)).toEqual(['m3', 'm2']);
+    expect(addIssues([], added, 2).map((entry) => entry.event.message)).toEqual(['m3', 'm2']);
   });
 });
 
-describe('warningReport', () => {
+describe('issueReport', () => {
   it('describes the finding with its owner, count, guide and data', () => {
-    const [entry] = addWarnings(
+    const [entry] = addIssues(
       [],
       [
         {
@@ -98,9 +98,9 @@ describe('warningReport', () => {
         { event: finding(), subject: undefined, at: 2 },
       ],
     );
-    const report = warningReport({ entry: entry!, guideUrl: 'https://guide#x', route: '/' });
+    const report = issueReport({ entry: entry!, guideUrl: 'https://guide#x', route: '/' });
 
-    expect(report).toContain('# Solid warn: `STRICT_READ_UNTRACKED`');
+    expect(report).toContain('# Solid issue (warn): `STRICT_READ_UNTRACKED`');
     expect(report).toContain('Reactive value "draft" read directly in <Draft>.');
     expect(report).toContain('- Owner path: `<App> > <Draft>`');
     expect(report).toContain('- Node: `draft`');
@@ -109,7 +109,7 @@ describe('warningReport', () => {
   });
 
   it('redacts sensitive data', () => {
-    const [entry] = addWarnings(
+    const [entry] = addIssues(
       [],
       [
         {
@@ -119,7 +119,7 @@ describe('warningReport', () => {
         },
       ],
     );
-    const report = warningReport({ entry: entry!, guideUrl: undefined, route: '/' });
+    const report = issueReport({ entry: entry!, guideUrl: undefined, route: '/' });
     expect(report).toContain('"token": "[redacted]"');
     expect(report).toContain('"strictRead": "<Draft>"');
     expect(report).not.toContain('Repair guide');

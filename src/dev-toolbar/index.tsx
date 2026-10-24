@@ -24,23 +24,23 @@ import {
   MinimizeIcon,
   SolidIcon,
   TreeIcon,
-  WarningIcon,
+  IssueIcon,
 } from './icons.js';
 import { excludeOwner, includeOwner } from './ownership/registry.js';
 import { excludeReactiveOwner, includeReactiveOwner } from './reactivity/registry.js';
-import { addWarnings, captureWarnings, type WarningEntry } from './warnings/tracker.js';
+import { addIssues, captureIssues, type IssueEntry } from './issues/tracker.js';
 import './index.css';
 
 const ErrorViewer = clientOnly(() => import('./error-viewer/index.js'), { lazy: true });
 const ReactivityViewer = clientOnly(() => import('./reactivity/index.js'), { lazy: true });
 const OwnershipViewer = clientOnly(() => import('./ownership/index.js'), { lazy: true });
-const WarningsViewer = clientOnly(() => import('./warnings/index.js'), { lazy: true });
+const IssuesViewer = clientOnly(() => import('./issues/index.js'), { lazy: true });
 
-type Tab = 'err' | 'warn' | 'fn' | 'rx' | 'own';
+type Tab = 'err' | 'issues' | 'fn' | 'rx' | 'own';
 
 const TABS: { value: Tab; label: string; icon: typeof ErrorIcon }[] = [
   { value: 'err', label: 'Errors', icon: ErrorIcon },
-  { value: 'warn', label: 'Warnings', icon: WarningIcon },
+  { value: 'issues', label: 'Issues', icon: IssueIcon },
   { value: 'fn', label: 'Server functions', icon: FunctionIcon },
   { value: 'rx', label: 'Reactivity', icon: GraphIcon },
   { value: 'own', label: 'Ownership', icon: TreeIcon },
@@ -315,13 +315,11 @@ export function DevToolbar(props: DevToolbarProps) {
 
   // Findings arrive while the app renders, before the toolbar settles, so the
   // channel is joined during setup instead of in `onSettled`.
-  const [warnings, setWarnings] = createSignal<WarningEntry[]>([]);
+  const [issues, setIssues] = createSignal<IssueEntry[]>([]);
   if (!isServer) {
-    onCleanup(captureWarnings((added) => setWarnings((current) => addWarnings(current, added))));
+    onCleanup(captureIssues((added) => setIssues((current) => addIssues(current, added))));
   }
-  const warningCount = createMemo(() =>
-    warnings().reduce((total, entry) => total + entry.count, 0),
-  );
+  const issueCount = createMemo(() => issues().reduce((total, entry) => total + entry.count, 0));
 
   const [instances, setInstances] = createSignal<
     Record<string, ServerFunctionInstance | undefined>
@@ -345,7 +343,7 @@ export function DevToolbar(props: DevToolbarProps) {
 
   const badge = (value: Tab): number => {
     if (value === 'err') return errors().length;
-    if (value === 'warn') return warningCount();
+    if (value === 'issues') return issueCount();
     if (value === 'fn') return callCount();
     return 0;
   };
@@ -453,7 +451,7 @@ export function DevToolbar(props: DevToolbarProps) {
                               data-solid-dev-toolbar-tab-badge={
                                 entry.value === 'err'
                                   ? 'failure'
-                                  : entry.value === 'warn'
+                                  : entry.value === 'issues'
                                     ? 'warning'
                                     : undefined
                               }
@@ -474,10 +472,10 @@ export function DevToolbar(props: DevToolbarProps) {
                 aria-labelledby={`solid-dev-toolbar-tab-${tab()}`}
               >
                 <ErrorViewer show={visible('err')} errors={errors()} resetError={resetError} />
-                <WarningsViewer
-                  show={visible('warn')}
-                  entries={warnings()}
-                  onClear={() => setWarnings([])}
+                <IssuesViewer
+                  show={visible('issues')}
+                  entries={issues()}
+                  onClear={() => setIssues([])}
                   onViewOwner={(owner) => {
                     setOwnershipFocus({ owner });
                     show('own');

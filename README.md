@@ -5,7 +5,7 @@ Development error and server-function tooling for Solid Start mode.
 `@solidjs/start-devtools` provides the toolbar used by the Solid Vite plugin in development.
 
 - Runtime error inspection with source-mapped stack frames.
-- The runtime's own warnings, such as a signal read outside a tracking scope.
+- The issues the runtime reports, such as a signal read outside a tracking scope.
 - Server-function request and response inspection.
 - A reactivity graph of the live signals, memos and effects in the app.
 - An ownership tree of the components and scopes the app created.
@@ -48,9 +48,9 @@ pnpm demo
 pnpm demo:explorer
 ```
 
-## Warnings
+## Issues
 
-The warnings panel lists what the Solid runtime reports on its diagnostics channel, such as
+The issues panel lists what the Solid runtime reports on its diagnostics channel, such as
 a signal read outside a tracking scope or a write inside a component. The console prints
 the same findings, mixed with everything else.
 
@@ -62,7 +62,7 @@ the same findings, mixed with everything else.
 - **Open the repair guide** opens the section for its code.
 
 The panel listens from the moment the toolbar mounts, so findings from the first render
-are there when you open it. Warnings need a development build of `solid-js`.
+are there when you open it. Issues need a development build of `solid-js`.
 
 ## Reactivity graph
 
