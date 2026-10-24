@@ -332,7 +332,7 @@ test('maps the ownership tree', async ({ page }) => {
   const rows = page.locator('[data-solid-ownership-name]');
 
   await openTab(page, 'Ownership');
-  await expect(rows).toHaveText(['<App>', '<Greeting>', '<Counter>', '<Show>']);
+  await expect(rows).toHaveText(['<App>', '<Greeting>', '<Counter>', '<Show>', '<Show>']);
 
   // The expand arrow keeps its full size inside the button.
   const arrow = await page
@@ -446,6 +446,47 @@ test('maps the ownership tree', async ({ page }) => {
       .filter({ hasText: /^doubled/ })
       .first(),
   ).toHaveAttribute('data-solid-reactivity-node', 'selected');
+});
+
+test('lists runtime warnings', async ({ page }) => {
+  await page.goto('/');
+
+  // Each render of the reader reports the same untracked read.
+  for (let i = 0; i < 3; i++) await page.locator('#emit-warning').click();
+  await openTab(page, 'Warnings');
+  await expect(page.getByRole('tab', { name: 'Warnings', exact: true })).toContainText('2');
+
+  const rows = page.locator('[data-solid-warnings-row]');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('STRICT_READ_UNTRACKED');
+  await expect(rows.first()).toContainText('×2');
+  // The toolbar's own owners are not part of the path.
+  await expect(rows.first()).toContainText('<App> › <Show> › value › <DraftReader>');
+  await expect(rows.first()).not.toContainText('<DevToolbar>');
+
+  // The severity filter hides it.
+  await page.locator('[data-solid-warnings-filter="warn"]').click();
+  await expect(rows).toHaveCount(0);
+  await page.locator('[data-solid-warnings-filter="warn"]').click();
+
+  // The detail links to the component in the ownership tree.
+  await rows.first().click();
+  const detail = page.locator('[data-solid-warnings-detail]');
+  await expect(detail).toContainText('draft');
+  await expect(detail.getByRole('link', { name: 'Open the repair guide' })).toHaveAttribute(
+    'href',
+    /reactivity-diagnostics.*#strict_read_untracked/,
+  );
+  await detail.getByRole('button', { name: 'Show in the ownership tree' }).click();
+  await expect(page.locator('[data-solid-ownership-row][data-selected]')).toContainText(
+    '<DraftReader>',
+  );
+
+  // Clearing empties the list and the count.
+  await openTab(page, 'Warnings');
+  await page.getByRole('button', { name: 'Clear warnings' }).click();
+  await expect(rows).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Warnings', exact: true })).not.toContainText('2');
 });
 
 test('copies reports for an agent', async ({ page, context }) => {

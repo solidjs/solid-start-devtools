@@ -9,6 +9,7 @@ import {
   For,
   getOwner,
   OBSERVE,
+  onCleanup,
   onSettled,
   Show,
 } from 'solid-js';
@@ -16,19 +17,30 @@ import version from '../version.js';
 import IconButton from '../ui/IconButton.js';
 import { type ServerFunctionInstance, ServerFunctionViewer } from './functions/index.js';
 import { captureServerFunctionCall } from './functions/tracker.js';
-import { ErrorIcon, FunctionIcon, GraphIcon, MinimizeIcon, SolidIcon, TreeIcon } from './icons.js';
+import {
+  ErrorIcon,
+  FunctionIcon,
+  GraphIcon,
+  MinimizeIcon,
+  SolidIcon,
+  TreeIcon,
+  WarningIcon,
+} from './icons.js';
 import { excludeOwner, includeOwner } from './ownership/registry.js';
 import { excludeReactiveOwner, includeReactiveOwner } from './reactivity/registry.js';
+import { addWarnings, captureWarnings, type WarningEntry } from './warnings/tracker.js';
 import './index.css';
 
 const ErrorViewer = clientOnly(() => import('./error-viewer/index.js'), { lazy: true });
 const ReactivityViewer = clientOnly(() => import('./reactivity/index.js'), { lazy: true });
 const OwnershipViewer = clientOnly(() => import('./ownership/index.js'), { lazy: true });
+const WarningsViewer = clientOnly(() => import('./warnings/index.js'), { lazy: true });
 
-type Tab = 'err' | 'fn' | 'rx' | 'own';
+type Tab = 'err' | 'warn' | 'fn' | 'rx' | 'own';
 
 const TABS: { value: Tab; label: string; icon: typeof ErrorIcon }[] = [
   { value: 'err', label: 'Errors', icon: ErrorIcon },
+  { value: 'warn', label: 'Warnings', icon: WarningIcon },
   { value: 'fn', label: 'Server functions', icon: FunctionIcon },
   { value: 'rx', label: 'Reactivity', icon: GraphIcon },
   { value: 'own', label: 'Ownership', icon: TreeIcon },
@@ -301,6 +313,16 @@ export function DevToolbar(props: DevToolbarProps) {
     };
   });
 
+  // Findings arrive while the app renders, before the toolbar settles, so the
+  // channel is joined during setup instead of in `onSettled`.
+  const [warnings, setWarnings] = createSignal<WarningEntry[]>([]);
+  if (!isServer) {
+    onCleanup(captureWarnings((added) => setWarnings((current) => addWarnings(current, added))));
+  }
+  const warningCount = createMemo(() =>
+    warnings().reduce((total, entry) => total + entry.count, 0),
+  );
+
   const [instances, setInstances] = createSignal<
     Record<string, ServerFunctionInstance | undefined>
   >({});
@@ -323,6 +345,7 @@ export function DevToolbar(props: DevToolbarProps) {
 
   const badge = (value: Tab): number => {
     if (value === 'err') return errors().length;
+    if (value === 'warn') return warningCount();
     if (value === 'fn') return callCount();
     return 0;
   };
@@ -428,7 +451,11 @@ export function DevToolbar(props: DevToolbarProps) {
                             <span
                               id={`solid-dev-toolbar-tab-${entry.value}-count`}
                               data-solid-dev-toolbar-tab-badge={
-                                entry.value === 'err' ? 'failure' : undefined
+                                entry.value === 'err'
+                                  ? 'failure'
+                                  : entry.value === 'warn'
+                                    ? 'warning'
+                                    : undefined
                               }
                             >
                               {count()}
@@ -447,6 +474,19 @@ export function DevToolbar(props: DevToolbarProps) {
                 aria-labelledby={`solid-dev-toolbar-tab-${tab()}`}
               >
                 <ErrorViewer show={visible('err')} errors={errors()} resetError={resetError} />
+                <WarningsViewer
+                  show={visible('warn')}
+                  entries={warnings()}
+                  onClear={() => setWarnings([])}
+                  onViewOwner={(owner) => {
+                    setOwnershipFocus({ owner });
+                    show('own');
+                  }}
+                  onViewInGraph={(node) => {
+                    setGraphFocus({ node });
+                    show('rx');
+                  }}
+                />
                 <ReactivityViewer
                   show={visible('rx')}
                   focus={graphFocus()}
