@@ -84,6 +84,20 @@ export function rootChanges(causes: ChangeRecord[], out = new Map<number, Change
   return out;
 }
 
+/** The names the runtime gives a signal or a memo created without a `name` option. */
+const DEFAULT_NAMES = new Set(['signal', 'computed', 'memo']);
+
+/**
+ * An update no action caused whose writes all went to unnamed signals, or
+ * that wrote nothing. Most come from the runtime's own state, such as the
+ * condition of a `<Show>` or a `<Loading>` boundary settling, so the panel
+ * hides them unless asked. An app's own unnamed signal looks the same, which
+ * is why they are hidden and not dropped.
+ */
+export function isUnnamedUpdate(entry: TimelineEntry): boolean {
+  return !entry.origin && entry.writes.every((write) => DEFAULT_NAMES.has(write.name));
+}
+
 function externalLabel(writes: ChangeRecord[]): string {
   const origin = writes.find((write) => write.origin)?.origin;
   const source = origin && origin.kind !== 'external' ? formatOrigin(origin) : 'update';

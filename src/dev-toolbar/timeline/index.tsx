@@ -11,6 +11,7 @@ import { pageRoute } from '../report/markdown.js';
 import { ms, plural, timelineReport } from '../report/timeline-report.js';
 import {
   isTimelineAvailable,
+  isUnnamedUpdate,
   type TimelineCall,
   type TimelineEntry,
   type TimelineRun,
@@ -190,13 +191,19 @@ export interface TimelineViewerProps {
 
 export default function TimelineViewer(props: TimelineViewerProps): JSX.Element {
   const [query, setQuery] = createSignal('');
+  const [showUnnamed, setShowUnnamed] = createSignal(false);
   const [selected, setSelected] = createSignal<number>();
   const [openRuns, setOpenRuns] = createSignal<number[]>([]);
 
+  const unnamedCount = createMemo(() => props.entries.filter(isUnnamedUpdate).length);
+
   const shown = createMemo(() => {
     const search = query().trim().toLowerCase();
-    if (!search) return props.entries;
-    return props.entries.filter(
+    const entries = showUnnamed()
+      ? props.entries
+      : props.entries.filter((entry) => !isUnnamedUpdate(entry));
+    if (!search) return entries;
+    return entries.filter(
       (entry) =>
         entry.label.toLowerCase().includes(search) ||
         entry.writes.some((write) => write.name.toLowerCase().includes(search)) ||
@@ -232,6 +239,19 @@ export default function TimelineViewer(props: TimelineViewerProps): JSX.Element 
               value={query()}
               onInput={(event) => setQuery(event.currentTarget.value)}
             />
+            <Show when={unnamedCount()}>
+              <button
+                type="button"
+                data-solid-timeline-unnamed
+                aria-pressed={showUnnamed() ? 'true' : 'false'}
+                title="Updates no action caused, whose writes all went to unnamed signals"
+                onClick={() => setShowUnnamed((current) => !current)}
+              >
+                <Text options={{ size: 'xs', weight: 'semibold', wrap: 'nowrap' }}>
+                  {`${showUnnamed() ? 'Hide' : 'Show'} ${plural(unnamedCount(), 'unnamed update')}`}
+                </Text>
+              </button>
+            </Show>
             <div data-solid-timeline-nav-actions>
               <Text data-solid-timeline-count options={{ size: 'xs', font: 'mono' }}>
                 {`${shown().length} of ${props.entries.length}`}
