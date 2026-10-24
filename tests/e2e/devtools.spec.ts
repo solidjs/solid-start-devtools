@@ -534,6 +534,28 @@ test('shows what each action re-ran and why', async ({ page }) => {
   await expect(page.locator('[data-solid-reactivity-detail]')).toContainText('doubled');
 });
 
+test('lists the server calls of an action and opens them', async ({ page }) => {
+  await page.goto('/');
+  // The handler writes nothing, so the call is all the click did.
+  await page.locator('#call-server').click();
+
+  await openTab(page, 'Timeline');
+  const row = page.locator('[data-solid-timeline-row]').filter({ hasText: 'button#call-server' });
+  await expect(row).toContainText('1 call');
+  await row.click();
+
+  const call = page.locator('[data-solid-timeline-call]');
+  await expect(call).toContainText('loadUser');
+  await expect(call).toContainText('200');
+  await call.click();
+
+  await expect(page.getByRole('tab', { name: 'Server functions', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.locator('[data-solid-function-instance-viewer]')).toContainText('loadUser');
+});
+
 test('copies reports for an agent', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const clipboard = () => page.evaluate(() => navigator.clipboard.readText());

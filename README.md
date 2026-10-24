@@ -78,6 +78,9 @@ of it. An update from outside a handler, such as a timer or a promise, is a row 
   those, down to the write that started them.
 - A re-run marked **no change** produced the same value as before, so its work was wasted.
 - The eye opens the memo or effect in the reactivity graph.
+- Server-function calls the action made are listed with their status and time. Click one
+  to open it in the server-function panel. A click that only calls the server still gets a
+  row.
 
 The panel turns on the attribution engine of `solid-js` (`solid-js/attribution`) when the
 toolbar mounts, so the first action is recorded even with the dock closed. Clicks in the
