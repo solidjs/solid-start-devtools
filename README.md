@@ -77,4 +77,24 @@ extra setup. Clicking it asks the dev server to open the file in your editor.
 The panel reads the tree through the development hooks in `solid-js`, so it is empty in a
 production build of the runtime. It only watches while it is open.
 
+## Copy for an agent
+
+Each panel has a copy button that puts a Markdown report on the clipboard. Paste it into
+an agent such as Claude Code, so it sees what the panel shows.
+
+- Errors. The message, the stack mapped to the original source, and the lines of source
+  around the first frames in the app. Runs of frames in dependencies are folded into one line.
+- Server functions. The function, the status and time, and the headers and body of the
+  request and the response. A streamed body is read for half a second.
+- Ownership. The component with its declared location, owner path, prop names, signals,
+  memos, effects and children.
+- Reactivity. The signal, memo or effect with its state and value, what it reads, and what
+  reads it.
+
+Values with sensitive names are replaced with `[redacted]` before the report is copied.
+This covers headers such as `cookie` and `authorization`, and keys, fields and signals
+whose names contain words such as `password`, `token`, `secret` or `session`. Check a
+report before you share it outside your machine, since a secret under another name is
+copied as is.
+
 For more inspection tools, see [Solid Devtools](https://github.com/thetarnav/solid-devtools).

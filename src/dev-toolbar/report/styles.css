@@ -1,0 +1,25 @@
+/* In the heading of a detail pane, the button sits at the end, sized like the other actions there. */
+[data-solid-ownership-detail-head] [data-solid-copy-report],
+[data-solid-reactivity-card-head] [data-solid-copy-report] {
+  margin-left: auto;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+}
+
+[data-solid-ownership-detail-head] [data-solid-ownership-view-graph] ~ [data-solid-copy-report] {
+  margin-left: 0;
+}
+
+[data-solid-ownership-detail-head] [data-solid-copy-report] > svg,
+[data-solid-reactivity-card-head] [data-solid-copy-report] > svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+[data-solid-icon-button][data-solid-copy-report='copied'] {
+  color: var(--start-dt-kind-effect, oklch(0.72 0.15 150));
+}
+
+[data-solid-icon-button][data-solid-copy-report='failed'] {
+  color: var(--start-dt-danger);
+}

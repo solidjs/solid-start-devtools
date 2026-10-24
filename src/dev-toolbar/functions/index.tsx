@@ -9,6 +9,9 @@ import { Select, SelectOption } from '../../ui/Select.js';
 import { Tab, TabGroup, TabList, TabPanel } from '../../ui/Tabs.js';
 import { Text } from '../../ui/Text.js';
 import { TrashIcon } from '../icons.js';
+import { CopyReportButton } from '../report/CopyReportButton.js';
+import { readReportBody, serverFunctionReport } from '../report/function-report.js';
+import { pageRoute } from '../report/markdown.js';
 import { BlobViewer } from './BlobViewer.js';
 import { FormDataViewer } from './FormDataViewer.js';
 import { HeadersViewer } from './HeadersViewer.js';
@@ -284,6 +287,14 @@ interface ServerFunctionInstanceViewerProps {
   onDelete: () => void;
 }
 
+async function copyCallReport(instance: ServerFunctionInstance): Promise<string> {
+  const [requestBody, responseBody] = await Promise.all([
+    readReportBody(instance.request.source),
+    instance.response ? readReportBody(instance.response.source) : undefined,
+  ]);
+  return serverFunctionReport({ ...instance, requestBody, responseBody, route: pageRoute() });
+}
+
 function ServerFunctionInstanceViewer(props: ServerFunctionInstanceViewerProps): JSX.Element {
   const [tab, setTab] = createSignal<'request' | 'response'>('request');
   return (
@@ -304,6 +315,7 @@ function ServerFunctionInstanceViewer(props: ServerFunctionInstanceViewerProps):
               </span>
             )}
           </Show>
+          <CopyReportButton label="this call" report={() => copyCallReport(props.instance)} />
           <IconButton onClick={props.onDelete}>
             <TrashIcon title="Delete instance" />
           </IconButton>

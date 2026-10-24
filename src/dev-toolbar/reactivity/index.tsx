@@ -5,6 +5,9 @@ import IconButton from '../../ui/IconButton.js';
 import Placeholder from '../../ui/Placeholder.js';
 import { Text } from '../../ui/Text.js';
 import { FitIcon, PauseIcon, PlayIcon } from '../icons.js';
+import { CopyReportButton } from '../report/CopyReportButton.js';
+import { pageRoute } from '../report/markdown.js';
+import { reactiveReport } from '../report/reactive-report.js';
 import { formatValue, typeName } from './format.js';
 import {
   ARROW_SIZE,
@@ -59,7 +62,12 @@ function ownerText(node: ReactiveNode): string {
   return node.ownerPath.length > 0 ? node.ownerPath.join(' › ') : 'unnamed owner';
 }
 
-function NodeSummary(props: { node: ReactiveNode; onOwner?: () => void }): JSX.Element {
+function NodeSummary(props: {
+  node: ReactiveNode;
+  onOwner?: () => void;
+  /** Adds a button that copies a report of the node. */
+  onReport?: () => string;
+}): JSX.Element {
   return (
     <>
       <div data-solid-reactivity-card-head>
@@ -68,6 +76,9 @@ function NodeSummary(props: { node: ReactiveNode; onOwner?: () => void }): JSX.E
           {props.node.name}
         </Text>
         {stateBadge(props.node)}
+        <Show when={props.onReport}>
+          {(report) => <CopyReportButton label={`this ${props.node.kind}`} report={report()} />}
+        </Show>
       </div>
       <div data-solid-reactivity-card-row>
         <Text options={{ size: 'xs', weight: 'semibold', wrap: 'nowrap' }}>value</Text>
@@ -647,6 +658,14 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
                     <div data-solid-reactivity-detail-content>
                       <NodeSummary
                         node={node()}
+                        onReport={() =>
+                          reactiveReport({
+                            node: node(),
+                            // Every node, so a source the filter hides is still named.
+                            nodes: new Map(graph().nodes.map((item) => [item.id, item])),
+                            route: pageRoute(),
+                          })
+                        }
                         onOwner={
                           props.onViewOwner
                             ? () => {

@@ -17,6 +17,9 @@ import {
   ViewCompiledIcon,
   ViewOriginalIcon,
 } from '../icons.js';
+import { CopyReportButton } from '../report/CopyReportButton.js';
+import { errorReport, resolveErrorFrames } from '../report/error-report.js';
+import { pageRoute } from '../report/markdown.js';
 import { CodeView } from './CodeView.js';
 import { createStackFrame, type StackFrameSource } from './create-stack-frame.js';
 import download from './download.js';
@@ -271,6 +274,11 @@ export default function ErrorViewer(props: ErrorViewerProps): JSX.Element {
     window.open(url, '_blank')!.focus();
   }
 
+  async function copyErrorReport(): Promise<string> {
+    const error = props.errors[truncated() - 1];
+    return errorReport({ error, frames: await resolveErrorFrames(error), route: pageRoute() });
+  }
+
   function redirectToDiscord() {
     window.open(DISCORD_INVITE, '_blank')!.focus();
   }
@@ -304,6 +312,7 @@ export default function ErrorViewer(props: ErrorViewerProps): JSX.Element {
                 </Show>
               </div>
               <div data-solid-error-viewer-controls>
+                <CopyReportButton label="this error" report={copyErrorReport} />
                 <IconButton data-solid-error-viewer-button onClick={redirectToGithub} type="button">
                   <GithubIcon title="Create an issue thread on Github" />
                 </IconButton>

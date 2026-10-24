@@ -391,6 +391,54 @@ test('maps the ownership tree', async ({ page }) => {
   ).toHaveAttribute('data-solid-reactivity-node', 'selected');
 });
 
+test('copies reports for an agent', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const clipboard = () => page.evaluate(() => navigator.clipboard.readText());
+  const copy = (name: string) =>
+    page.getByRole('button', { name: `Copy ${name} for an agent` }).click();
+
+  await page.goto('/');
+
+  // An error, with its mapped stack and the source around the frame.
+  await page.locator('#throw-client-error').click();
+  await copy('this error');
+  await expect.poll(clipboard).toContain('# Error in a Solid app');
+  const error = await clipboard();
+  expect(error).toContain('Error: client boom');
+  expect(error).toMatch(/`Broken` at `[^`]*app\.tsx:\d+:\d+`/);
+  expect(error).toContain("throw new Error('client boom');");
+
+  // The error replaced the app, so the other panels start from a fresh page.
+  await page.reload();
+
+  // A server-function call, with both bodies.
+  await page.locator('#emit-server-function-request').click();
+  await page.locator('#emit-server-function-response').click();
+  await openTab(page, 'Server functions');
+  await page.locator('[data-solid-functions-instances] [data-solid-select-option]').first().click();
+  await copy('this call');
+  await expect.poll(clipboard).toContain('# Server function call: `loadUser`');
+  expect(await clipboard()).toContain('- Response: `201`');
+
+  // A component, with its signals and where it sits.
+  await openTab(page, 'Ownership');
+  await page.locator('[data-solid-ownership-label]').filter({ hasText: '<Counter>' }).click();
+  await copy('this component');
+  await expect.poll(clipboard).toContain('# Solid component: `<Counter>`');
+  expect(await clipboard()).toContain('- `count` = `0`');
+
+  // A memo, with what it reads and what reads it.
+  await openTab(page, 'Reactivity');
+  await page
+    .locator('[data-solid-reactivity-node]')
+    .filter({ hasText: /^doubled/ })
+    .first()
+    .click();
+  await copy('this memo');
+  await expect.poll(clipboard).toContain('# Solid memo: `doubled`');
+  expect(await clipboard()).toContain('- signal `count` = `0`');
+});
+
 test('mounts once and disposes', async ({ page }) => {
   await page.goto('/?mount');
 
