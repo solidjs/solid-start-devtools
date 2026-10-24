@@ -81,6 +81,9 @@ of it. An update from outside a handler, such as a timer or a promise, is a row 
 - Server-function calls the action made are listed with their status and time. Click one
   to open it in the server-function panel. A click that only calls the server still gets a
   row.
+- Updates no action caused whose writes all went to unnamed signals are hidden, since most
+  come from Solid's own state, such as a `<Show>` condition. The button above the list shows
+  how many there are and brings them back.
 
 The panel turns on the attribution engine of `solid-js` (`solid-js/attribution`) when the
 toolbar mounts, so the first action is recorded even with the dock closed. Clicks in the

@@ -8,7 +8,7 @@ import type {
 } from 'solid-js/attribution';
 import { timelineReport } from '../report/timeline-report.js';
 import type { CallEvent } from '@solidjs/web';
-import { callInteraction, rootChanges, TimelineBuilder } from './tracker.js';
+import { callInteraction, isUnnamedUpdate, rootChanges, TimelineBuilder } from './tracker.js';
 
 const click: ChangeOrigin = {
   kind: 'interaction',
@@ -226,6 +226,28 @@ describe('TimelineBuilder calls', () => {
     const builder = new TimelineBuilder();
     builder.call(call({ origin: undefined }), undefined);
     expect(builder.snapshot()).toHaveLength(0);
+  });
+});
+
+describe('isUnnamedUpdate', () => {
+  it('marks updates no action caused that wrote only unnamed signals, or nothing', () => {
+    const builder = new TimelineBuilder();
+    const unnamed: ChangeRecord = {
+      ...write,
+      seq: 20,
+      name: 'signal',
+      origin: { kind: 'external' },
+    };
+    const named: ChangeRecord = { ...write, seq: 21, name: 'clock', origin: { kind: 'external' } };
+    builder.rerun(rerun({ run: 1, interaction: undefined, causes: [unnamed] }), undefined);
+    builder.flush(flush());
+    builder.rerun(rerun({ run: 2, interaction: undefined, causes: [] }), undefined);
+    builder.flush(flush());
+    builder.rerun(rerun({ run: 3, interaction: undefined, causes: [named] }), undefined);
+    builder.flush(flush());
+    builder.rerun(rerun({ run: 4, causes: [{ ...unnamed, seq: 22, origin: click }] }), undefined);
+
+    expect(builder.snapshot().map(isUnnamedUpdate)).toEqual([false, false, true, true]);
   });
 });
 
