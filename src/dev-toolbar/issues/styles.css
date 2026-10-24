@@ -1,4 +1,4 @@
-[data-solid-warnings-viewer] {
+[data-solid-issues-viewer] {
   color: var(--start-dt-text);
 
   display: flex;
@@ -8,7 +8,7 @@
   min-height: 0;
 }
 
-[data-solid-warnings-nav] {
+[data-solid-issues-nav] {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -20,7 +20,7 @@
   border-bottom: var(--start-dt-border-soft) 1px solid;
 }
 
-[data-solid-warnings-search] {
+[data-solid-issues-search] {
   flex: 1;
   min-width: 6rem;
   max-width: 18rem;
@@ -37,12 +37,12 @@
   line-height: 1rem;
 }
 
-[data-solid-warnings-search]:focus {
+[data-solid-issues-search]:focus {
   outline: none;
   border-color: var(--start-dt-accent);
 }
 
-[data-solid-warnings-filters] {
+[data-solid-issues-filters] {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -50,7 +50,7 @@
   gap: 0.25rem;
 }
 
-[data-solid-warnings-filter] {
+[data-solid-issues-filter] {
   display: flex;
   align-items: center;
 
@@ -66,7 +66,7 @@
   cursor: pointer;
 }
 
-[data-solid-warnings-filter]::before {
+[data-solid-issues-filter]::before {
   content: '';
 
   width: 0.5rem;
@@ -76,24 +76,24 @@
   background: var(--start-dt-danger);
 }
 
-[data-solid-warnings-filter='warn']::before {
+[data-solid-issues-filter='warn']::before {
   background: oklch(0.8 0.15 80);
 }
 
-[data-solid-warnings-filter='info']::before {
+[data-solid-issues-filter='info']::before {
   background: oklch(0.68 0.13 245);
 }
 
-[data-solid-warnings-filter]:hover {
+[data-solid-issues-filter]:hover {
   background: var(--start-dt-surface-hover);
 }
 
-[data-solid-warnings-filter][data-off] {
+[data-solid-issues-filter][data-off] {
   color: var(--start-dt-text-muted);
   opacity: 0.55;
 }
 
-[data-solid-warnings-nav-actions] {
+[data-solid-issues-nav-actions] {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -103,12 +103,12 @@
   margin-left: auto;
 }
 
-[data-solid-warnings-count] {
+[data-solid-issues-count] {
   color: var(--start-dt-text-muted);
   white-space: nowrap;
 }
 
-[data-solid-warnings-body] {
+[data-solid-issues-body] {
   display: flex;
   flex-direction: row;
 
@@ -116,7 +116,7 @@
   min-height: 0;
 }
 
-[data-solid-warnings-list] {
+[data-solid-issues-list] {
   display: flex;
   flex-direction: column;
 
@@ -126,7 +126,7 @@
   overflow: auto;
 }
 
-[data-solid-warnings-row] {
+[data-solid-issues-row] {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -144,20 +144,20 @@
   cursor: pointer;
 }
 
-[data-solid-warnings-row]:hover {
+[data-solid-issues-row]:hover {
   background: var(--start-dt-surface-hover);
 }
 
-[data-solid-warnings-row][data-selected] {
+[data-solid-issues-row][data-selected] {
   background: var(--start-dt-surface-active);
 }
 
-[data-solid-warnings-row]:focus-visible {
+[data-solid-issues-row]:focus-visible {
   outline: 2px solid var(--start-dt-accent);
   outline-offset: -2px;
 }
 
-[data-solid-warnings-row-head] {
+[data-solid-issues-row-head] {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -167,7 +167,7 @@
   min-width: 0;
 }
 
-[data-solid-warnings-row-count] {
+[data-solid-issues-row-count] {
   padding: 0 0.375rem;
 
   border-radius: 9999px;
@@ -179,14 +179,14 @@
   line-height: 1.125rem;
 }
 
-[data-solid-warnings-row-owner] {
+[data-solid-issues-row-owner] {
   overflow: hidden;
   text-overflow: ellipsis;
 
   color: var(--start-dt-text-muted);
 }
 
-[data-solid-warnings-row-message] {
+[data-solid-issues-row-message] {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -195,7 +195,7 @@
   color: var(--start-dt-text-muted);
 }
 
-[data-solid-warnings-detail] {
+[data-solid-issues-detail] {
   display: flex;
   flex-direction: column;
 
@@ -211,7 +211,7 @@
   overflow: auto;
 }
 
-[data-solid-warnings-detail-head] {
+[data-solid-issues-detail-head] {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -221,22 +221,22 @@
   min-width: 0;
 }
 
-[data-solid-warnings-detail-head] [data-solid-copy-report] {
+[data-solid-issues-detail-head] [data-solid-copy-report] {
   margin-left: auto;
   padding: 0.25rem;
   border-radius: 0.25rem;
 }
 
-[data-solid-warnings-detail-head] [data-solid-copy-report] > svg {
+[data-solid-issues-detail-head] [data-solid-copy-report] > svg {
   width: 0.875rem;
   height: 0.875rem;
 }
 
-[data-solid-warnings-detail-message] {
+[data-solid-issues-detail-message] {
   white-space: pre-wrap;
 }
 
-[data-solid-warnings-actions] {
+[data-solid-issues-actions] {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
@@ -244,7 +244,7 @@
   gap: 0.375rem;
 }
 
-[data-solid-warnings-action] {
+[data-solid-issues-action] {
   display: inline-flex;
   align-items: center;
 
@@ -261,23 +261,23 @@
   cursor: pointer;
 }
 
-[data-solid-warnings-action]:hover {
+[data-solid-issues-action]:hover {
   background: var(--start-dt-accent-soft);
 }
 
-[data-solid-warnings-action] > svg {
+[data-solid-issues-action] > svg {
   width: 0.875rem;
   height: 0.875rem;
 }
 
-[data-solid-warnings-data] {
+[data-solid-issues-data] {
   display: flex;
   flex-direction: column;
 
   gap: 0.25rem;
 }
 
-[data-solid-warnings-data] > pre {
+[data-solid-issues-data] > pre {
   margin: 0;
   padding: 0.5rem;
 
@@ -287,14 +287,14 @@
 }
 
 /* The pane scrolls, so its blocks keep their height instead of shrinking to fit. */
-[data-solid-warnings-detail] > * {
+[data-solid-issues-detail] > * {
   flex-shrink: 0;
 }
 
-[data-solid-warnings-data] > pre > * {
+[data-solid-issues-data] > pre > * {
   white-space: pre;
 }
 
-[data-solid-warnings-detail] [data-solid-kv-key] {
+[data-solid-issues-detail] [data-solid-kv-key] {
   flex-basis: 4rem;
 }

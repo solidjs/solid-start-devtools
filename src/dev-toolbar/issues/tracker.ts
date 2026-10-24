@@ -1,7 +1,7 @@
 import { OBSERVE } from 'solid-js';
 
 /** One finding of the runtime's diagnostics channel, as `OBSERVE.diagnostics` delivers it. */
-export interface WarningEvent {
+export interface IssueEvent {
   sequence: number;
   code: string;
   kind: string;
@@ -15,12 +15,12 @@ export interface WarningEvent {
 }
 
 /**
- * A warning in the panel. The runtime can report the same finding many times,
+ * An issue in the panel. The runtime can report the same finding many times,
  * such as a read in a list row, so equal findings are one entry with a count.
  */
-export interface WarningEntry {
+export interface IssueEntry {
   key: string;
-  event: WarningEvent;
+  event: IssueEvent;
   /**
    * The owner or signal the finding is about. Held weakly, so the panel does
    * not keep a disposed part of the app alive.
@@ -32,10 +32,10 @@ export interface WarningEntry {
 }
 
 /** Most entries the panel keeps. The oldest go first. */
-export const MAX_WARNINGS = 200;
+export const MAX_ISSUES = 200;
 
 /** The message without the `[CODE]` prefix the runtime puts on it for the console. */
-export function warningText(event: WarningEvent): string {
+export function issueText(event: IssueEvent): string {
   const prefix = `[${event.code}] `;
   return event.message.startsWith(prefix) ? event.message.slice(prefix.length) : event.message;
 }
@@ -56,7 +56,7 @@ export function appOwnerPath(path: string[] | undefined): string[] | undefined {
   return first === -1 ? rest : rest.slice(first);
 }
 
-function keyOf(event: WarningEvent): string {
+function keyOf(event: IssueEvent): string {
   return [event.code, event.ownerPath?.join('>') ?? '', event.nodeName ?? '', event.message].join(
     '\n',
   );
@@ -66,11 +66,11 @@ function keyOf(event: WarningEvent): string {
  * Adds findings to the entries, newest first. A finding equal to an entry
  * moves that entry to the top and counts it again.
  */
-export function addWarnings(
-  entries: WarningEntry[],
-  added: { event: WarningEvent; subject: object | undefined; at: number }[],
-  max = MAX_WARNINGS,
-): WarningEntry[] {
+export function addIssues(
+  entries: IssueEntry[],
+  added: { event: IssueEvent; subject: object | undefined; at: number }[],
+  max = MAX_ISSUES,
+): IssueEntry[] {
   const byKey = new Map(entries.map((entry) => [entry.key, entry]));
   for (const { event, subject, at } of added) {
     const key = keyOf(event);
@@ -102,7 +102,7 @@ export function addWarnings(
 }
 
 /** True when the runtime has a diagnostics channel, which is in dev and observe builds. */
-export function isWarningsAvailable(): boolean {
+export function isIssuesAvailable(): boolean {
   return !!OBSERVE?.diagnostics;
 }
 
@@ -111,12 +111,12 @@ export function isWarningsAvailable(): boolean {
  * the scope that misbehaved, where writing a signal is itself a finding, so
  * findings are collected and handed over on a microtask.
  */
-export function captureWarnings(
-  push: (added: { event: WarningEvent; subject: object | undefined; at: number }[]) => void,
+export function captureIssues(
+  push: (added: { event: IssueEvent; subject: object | undefined; at: number }[]) => void,
 ): () => void {
   const diagnostics = OBSERVE?.diagnostics;
   if (!diagnostics) return () => {};
-  let pending: { event: WarningEvent; subject: object | undefined; at: number }[] = [];
+  let pending: { event: IssueEvent; subject: object | undefined; at: number }[] = [];
   return diagnostics.subscribe((event, subject) => {
     if (!pending.length) {
       queueMicrotask(() => {
@@ -125,7 +125,7 @@ export function captureWarnings(
         push(batch);
       });
     }
-    const finding = event as WarningEvent;
+    const finding = event as IssueEvent;
     pending.push({
       event: { ...finding, ownerPath: appOwnerPath(finding.ownerPath) },
       subject: subject ?? undefined,
