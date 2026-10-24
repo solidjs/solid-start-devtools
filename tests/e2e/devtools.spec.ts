@@ -615,6 +615,24 @@ test('copies a report of the whole session', async ({ page, context }) => {
   expect(report).not.toContain('## Errors');
 });
 
+test('hides updates that only touched unnamed signals', async ({ page }) => {
+  await page.goto('/');
+  // The Loading boundary settles through Solid's own unnamed signals.
+  await page.locator('#show-async').click();
+  await expect(page.locator('#async-posts')).toHaveText('post of user 1');
+
+  await openTab(page, 'Timeline');
+  const rows = page.locator('[data-solid-timeline-row]');
+  const toggle = page.locator('[data-solid-timeline-unnamed]');
+  await expect(toggle).toContainText(/Show \d+ unnamed update/);
+  await expect(rows.filter({ hasText: /^update/ })).toHaveCount(0);
+  await expect(rows.filter({ hasText: 'button#show-async' })).toHaveCount(1);
+
+  await toggle.click();
+  await expect(toggle).toContainText(/Hide \d+ unnamed update/);
+  expect(await rows.count()).toBeGreaterThan(1);
+});
+
 test('copies reports for an agent', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const clipboard = () => page.evaluate(() => navigator.clipboard.readText());

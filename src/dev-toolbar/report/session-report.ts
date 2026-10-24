@@ -1,7 +1,7 @@
 import { concernOf, type AsyncRecord } from '../async/tracker.js';
 import type { ServerFunctionInstance } from '../functions/index.js';
 import { issueText, type IssueEntry } from '../issues/tracker.js';
-import type { TimelineEntry } from '../timeline/tracker.js';
+import { isUnnamedUpdate, type TimelineEntry } from '../timeline/tracker.js';
 import { asyncDuration, asyncOrigin, asyncTitle } from './async-report.js';
 import { errorReport, type ReportFrame } from './error-report.js';
 import { code } from './markdown.js';
@@ -95,11 +95,13 @@ export function sessionReport(input: SessionReportInput): string {
   out.push(`- Devtools: ${input.version}`);
 
   const failed = input.calls.map(failedCall).filter((line) => line !== undefined);
+  // The same updates the timeline hides by default, so the newest actions are real ones.
+  const actions = input.timeline.filter((entry) => !isUnnamedUpdate(entry));
   const flagged = input.asyncRecords.filter((record) => concernOf(record));
   const empty =
     !input.errorCount &&
     !input.issues.length &&
-    !input.timeline.length &&
+    !actions.length &&
     !flagged.length &&
     !failed.length;
   if (empty) {
@@ -130,9 +132,9 @@ export function sessionReport(input: SessionReportInput): string {
     if (rest > 0) out.push(`- … ${plural(rest, 'more issue')}`);
   }
 
-  if (input.timeline.length) {
+  if (actions.length) {
     out.push('', '## Recent actions, newest first', '');
-    for (const entry of input.timeline.slice(0, SESSION_ACTIONS)) out.push(actionLine(entry));
+    for (const entry of actions.slice(0, SESSION_ACTIONS)) out.push(actionLine(entry));
   }
 
   if (flagged.length) {
