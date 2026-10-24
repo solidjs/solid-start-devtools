@@ -9,7 +9,12 @@ import { EyeIcon, TrashIcon } from '../icons.js';
 import { CopyReportButton } from '../report/CopyReportButton.js';
 import { pageRoute } from '../report/markdown.js';
 import { ms, plural, timelineReport } from '../report/timeline-report.js';
-import { isTimelineAvailable, type TimelineEntry, type TimelineRun } from './tracker.js';
+import {
+  isTimelineAvailable,
+  type TimelineCall,
+  type TimelineEntry,
+  type TimelineRun,
+} from './tracker.js';
 import './styles.css';
 
 function outcomeBadge(entry: TimelineEntry): JSX.Element {
@@ -136,12 +141,51 @@ function RunRow(props: RunRowProps): JSX.Element {
   );
 }
 
+function CallRow(props: {
+  call: TimelineCall;
+  onViewCall?: (instance: string) => void;
+}): JSX.Element {
+  const status = () =>
+    props.call.event.status === undefined ? 'ERR' : String(props.call.event.status);
+  const content = (
+    <>
+      <Badge type="info">{props.call.event.method}</Badge>
+      <Text options={{ size: 'xs', weight: 'semibold', font: 'mono', wrap: 'nowrap' }}>
+        {props.call.event.name ?? props.call.event.id}
+      </Text>
+      <Badge type={props.call.event.outcome === 'ok' ? 'success' : 'failure'}>{status()}</Badge>
+      <Text data-solid-timeline-run-time options={{ size: 'xs', font: 'mono', wrap: 'nowrap' }}>
+        {ms(props.call.event.durationMs)}
+      </Text>
+    </>
+  );
+  return (
+    <Show
+      when={props.onViewCall && props.call.instance}
+      fallback={<span data-solid-timeline-call>{content}</span>}
+    >
+      {(current) => (
+        <button
+          type="button"
+          data-solid-timeline-call
+          title="Show in the server-function panel"
+          onClick={() => props.onViewCall?.(current())}
+        >
+          {content}
+        </button>
+      )}
+    </Show>
+  );
+}
+
 export interface TimelineViewerProps {
   show?: boolean;
   entries: TimelineEntry[];
   onClear: () => void;
   /** Opens a memo or an effect in the reactivity graph. */
   onViewInGraph?: (node: object) => void;
+  /** Opens a server-function call in its panel, by the panel's key for it. */
+  onViewCall?: (instance: string) => void;
 }
 
 export default function TimelineViewer(props: TimelineViewerProps): JSX.Element {
@@ -252,7 +296,12 @@ export default function TimelineViewer(props: TimelineViewerProps): JSX.Element 
                           </Text>
                         </span>
                         <Text data-solid-timeline-row-meta options={{ size: 'xs', font: 'mono' }}>
-                          {`${plural(entry.writes.length, 'write')} · ${plural(runCount(entry), 're-run')} · ${ms(duration(entry))}`}
+                          {[
+                            plural(entry.writes.length, 'write'),
+                            plural(runCount(entry), 're-run'),
+                            ...(entry.calls.length ? [plural(entry.calls.length, 'call')] : []),
+                            ms(duration(entry)),
+                          ].join(' · ')}
                         </Text>
                       </button>
                     )}
@@ -358,6 +407,17 @@ export default function TimelineViewer(props: TimelineViewerProps): JSX.Element 
                         Open a re-run to see the changes that caused it.
                       </Text>
                     </div>
+
+                    <Show when={entry().calls.length}>
+                      <div data-solid-timeline-section>
+                        <Text options={{ size: 'xs', weight: 'semibold' }}>
+                          {`Server calls (${entry().calls.length})`}
+                        </Text>
+                        <For each={entry().calls}>
+                          {(call) => <CallRow call={call} onViewCall={props.onViewCall} />}
+                        </For>
+                      </div>
+                    </Show>
 
                     <Show when={entry().holds.length}>
                       <div data-solid-timeline-section>

@@ -7,7 +7,8 @@ import type {
   RerunEvent,
 } from 'solid-js/attribution';
 import { timelineReport } from '../report/timeline-report.js';
-import { rootChanges, TimelineBuilder } from './tracker.js';
+import type { CallEvent } from '@solidjs/web';
+import { callInteraction, rootChanges, TimelineBuilder } from './tracker.js';
 
 const click: ChangeOrigin = {
   kind: 'interaction',
@@ -170,6 +171,64 @@ describe('TimelineBuilder', () => {
   });
 });
 
+function call(over: Partial<CallEvent> = {}): CallEvent {
+  return {
+    id: 'load-user',
+    name: 'loadUser',
+    at: 105,
+    durationMs: 40,
+    method: 'POST',
+    outcome: 'ok',
+    status: 200,
+    origin: click,
+    ...over,
+  };
+}
+
+describe('callInteraction', () => {
+  it('finds the interaction behind the frame a call was made in', () => {
+    expect(callInteraction(click)).toBe(click);
+    expect(callInteraction({ kind: 'effect', name: 'sync', interaction: click })).toBe(click);
+    expect(callInteraction({ kind: 'external' })).toBeUndefined();
+    expect(callInteraction(undefined)).toBeUndefined();
+  });
+});
+
+describe('TimelineBuilder calls', () => {
+  it('puts a call under the interaction that made it', () => {
+    const builder = new TimelineBuilder();
+    builder.rerun(rerun({}), undefined);
+    builder.call(
+      call({ origin: { kind: 'effect', name: 'sync', interaction: click } }),
+      'load-user#1',
+    );
+    const [entry] = builder.snapshot();
+    expect(entry!.calls).toEqual([
+      expect.objectContaining({
+        instance: 'load-user#1',
+        event: expect.objectContaining({ name: 'loadUser' }),
+      }),
+    ]);
+  });
+
+  it('keeps a click that only called the server', () => {
+    const builder = new TimelineBuilder();
+    builder.interaction(interaction({ writes: 0, runs: 0, outcome: 'idle' }));
+    expect(builder.snapshot()).toHaveLength(0);
+
+    builder.call(call(), 'load-user#1');
+    const [entry] = builder.snapshot();
+    expect(entry!.interaction?.outcome).toBe('idle');
+    expect(entry!.calls).toHaveLength(1);
+  });
+
+  it('leaves calls no interaction made to the server-function panel', () => {
+    const builder = new TimelineBuilder();
+    builder.call(call({ origin: undefined }), undefined);
+    expect(builder.snapshot()).toHaveLength(0);
+  });
+});
+
 describe('timelineReport', () => {
   it('lists the writes and each re-run with its causes', () => {
     const builder = new TimelineBuilder();
@@ -188,6 +247,20 @@ describe('timelineReport', () => {
     expect(report).toContain('- memo `doubled` (0.20ms)\n  - ← write `count` 0 → 1');
     expect(report).toContain(
       '- effect `title` (0.20ms, no change)\n  - ← `doubled` changed\n    - ← write `count` 0 → 1',
+    );
+  });
+
+  it('lists the server calls of the action', () => {
+    const builder = new TimelineBuilder();
+    builder.rerun(rerun({}), undefined);
+    builder.call(call(), undefined);
+    builder.call(
+      call({ name: 'save', outcome: 'error', status: undefined, durationMs: 12 }),
+      undefined,
+    );
+    const report = timelineReport({ entry: builder.snapshot()[0]!, route: '/' });
+    expect(report).toContain(
+      '## Server calls\n\n- POST `loadUser` → 200 in 40.0ms\n- POST `save` → no response in 12.0ms, failed',
     );
   });
 

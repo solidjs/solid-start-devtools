@@ -335,6 +335,8 @@ export function DevToolbar(props: DevToolbarProps) {
   const [graphFocus, setGraphFocus] = createSignal<{ node: object }>();
   // The graph can ask the ownership tree to show an owner the same way.
   const [ownershipFocus, setOwnershipFocus] = createSignal<{ owner: object }>();
+  // The timeline can ask the server-function panel to show a call.
+  const [functionsFocus, setFunctionsFocus] = createSignal<{ instance: string }>();
 
   const [errors, setErrors] = createSignal<unknown[]>([]);
 
@@ -619,6 +621,10 @@ export function DevToolbar(props: DevToolbarProps) {
                     timeline.clear();
                     setTimelineEntries([]);
                   }}
+                  onViewCall={(instance) => {
+                    setFunctionsFocus({ instance });
+                    show('fn');
+                  }}
                   onViewInGraph={(node) => {
                     setGraphFocus({ node });
                     show('rx');
@@ -644,6 +650,7 @@ export function DevToolbar(props: DevToolbarProps) {
                 />
                 <ServerFunctionViewer
                   show={visible('fn')}
+                  focus={functionsFocus()}
                   instances={instances()}
                   onDeleteInstance={(value) => {
                     setInstances((current) => {

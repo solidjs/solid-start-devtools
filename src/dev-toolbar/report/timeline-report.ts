@@ -100,6 +100,17 @@ export function timelineReport(input: TimelineReportInput): string {
     if (rest > 0) out.push(`- … ${rest} more re-runs`);
   }
 
+  if (entry.calls.length) {
+    out.push('', '## Server calls', '');
+    for (const { event } of entry.calls) {
+      const status = event.status === undefined ? 'no response' : String(event.status);
+      const outcome = event.outcome === 'ok' ? '' : ', failed';
+      out.push(
+        `- ${event.method} ${code(event.name ?? event.id)} → ${status} in ${ms(event.durationMs)}${outcome}`,
+      );
+    }
+  }
+
   if (entry.holds.length) {
     out.push('', '## Holds', '');
     for (const hold of entry.holds) {

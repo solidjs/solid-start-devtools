@@ -1,4 +1,6 @@
+import type { CallEvent } from '@solidjs/web';
 import { OBSERVE } from 'solid-js';
+import { instanceOfCall } from '../functions/records.js';
 import {
   attribution,
   formatOrigin,
@@ -19,6 +21,13 @@ export interface TimelineRun {
   node: WeakRef<object> | undefined;
   /** Time of the effect callback that followed the compute run, for an effect. */
   effectMs: number | undefined;
+}
+
+/** One server-function call the action made. */
+export interface TimelineCall {
+  event: CallEvent;
+  /** The server-function panel's key for the call, so the panel can show it. */
+  instance: string | undefined;
 }
 
 /**
@@ -48,12 +57,23 @@ export interface TimelineEntry {
   flushMs: number;
   holds: HoldEvent[];
   navigations: NavigationEvent[];
+  calls: TimelineCall[];
 }
 
 /** Most entries the panel keeps. The oldest go first. */
 export const MAX_ENTRIES = 100;
 /** Most re-runs one entry keeps. */
 export const MAX_RUNS = 300;
+
+/**
+ * The interaction a call ran for. A call made by a handler carries the
+ * interaction itself. One made for an effect, a navigation or a landing
+ * carries that frame, which names the interaction behind it.
+ */
+export function callInteraction(origin: ChangeOrigin | undefined): ChangeOrigin | undefined {
+  if (!origin) return undefined;
+  return origin.kind === 'interaction' ? origin : origin.interaction;
+}
 
 /** The writes, landings and refreshes a cause chain bottoms out in. */
 export function rootChanges(causes: ChangeRecord[], out = new Map<number, ChangeRecord>()) {
@@ -82,6 +102,11 @@ export class TimelineBuilder {
   /** The entry collecting re-runs that no interaction caused, until its flush ends. */
   private external: TimelineEntry | undefined;
   private changed = new Set<TimelineEntry>();
+  /**
+   * Interactions that changed nothing, kept aside. A click that only calls
+   * the server looks idle when its record arrives, and its call settles later.
+   */
+  private idle = new WeakMap<ChangeOrigin, InteractionEvent>();
 
   constructor(private readonly max = MAX_ENTRIES) {}
 
@@ -99,6 +124,7 @@ export class TimelineBuilder {
       flushMs: 0,
       holds: [],
       navigations: [],
+      calls: [],
     };
     this.entries.unshift(entry);
     for (const dropped of this.entries.splice(this.max)) {
@@ -160,7 +186,10 @@ export class TimelineBuilder {
   interaction(event: InteractionEvent): void {
     // A click on something that reads no state, such as the devtools themselves.
     const idle = !event.writes && !event.runs && !event.created && !event.holds.length;
-    if (idle && !this.byOrigin.has(event.origin)) return;
+    if (idle && !this.byOrigin.has(event.origin)) {
+      this.idle.set(event.origin, event);
+      return;
+    }
     const entry = this.entryFor(event.origin, event.at);
     entry.interaction = event;
     entry.at = event.at;
@@ -170,6 +199,23 @@ export class TimelineBuilder {
   hold(event: HoldEvent): void {
     const entry = this.entryFor(event.interaction, event.at);
     entry.holds.push(event);
+    this.touch(entry);
+  }
+
+  /**
+   * A server-function call joins the action it ran for. A call that no
+   * interaction made is left to the server-function panel.
+   */
+  call(event: CallEvent, instance: string | undefined): void {
+    const origin = callInteraction(event.origin);
+    if (!origin) return;
+    const entry = this.entryFor(origin, event.at);
+    const idle = this.idle.get(origin);
+    if (idle && !entry.interaction) {
+      entry.interaction = idle;
+      entry.at = idle.at;
+    }
+    entry.calls.push({ event, instance });
     this.touch(entry);
   }
 
@@ -193,6 +239,7 @@ export class TimelineBuilder {
         runs: entry.runs.slice(),
         holds: entry.holds.slice(),
         navigations: entry.navigations.slice(),
+        calls: entry.calls.slice(),
       };
       // Later records find the entry through its origin, so they reach the copy.
       if (copy.origin) this.byOrigin.set(copy.origin, copy);
@@ -206,6 +253,7 @@ export class TimelineBuilder {
   clear(): void {
     this.entries = [];
     this.byOrigin = new WeakMap();
+    this.idle = new WeakMap();
     this.external = undefined;
     this.changed.clear();
   }
@@ -257,6 +305,13 @@ export function startTimeline(builder: TimelineBuilder, onChange: () => void): (
     }),
     records.subscribe('navigation', (event) => {
       builder.navigation(event);
+      changed();
+    }),
+    records.subscribe('call', (event, live) => {
+      // The server-function panel listens from the moment the package loads, so
+      // it has given the call its key by now. The live object itself is not
+      // kept, since nothing else holds it once the call settled.
+      builder.call(event, instanceOfCall(live));
       changed();
     }),
   ];
