@@ -13,7 +13,27 @@ Development error and server-function tooling for Solid Start mode.
 pnpm add @solidjs/start-devtools@next
 ```
 
-The Vite plugin mounts it automatically. Integrations can use the package directly:
+In Start mode, `@solidjs/vite-plugin` mounts it automatically.
+
+For an app served from an `index.html`, add the devtools' own Vite plugin. It mounts the
+toolbar beside the app during `vite dev`, so the app needs no JSX for it. Builds,
+`vite preview` and Vitest are left alone.
+
+```ts
+// vite.config.ts
+import solid from '@solidjs/vite-plugin';
+import devtools from '@solidjs/start-devtools/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  plugins: [solid(), devtools()],
+});
+```
+
+The toolbar never mounts twice, so the plugin is safe in an app that also renders
+`DevToolbar`. Pass `devtools({ mount: false })` to keep the plugin without the mount.
+
+Integrations can use the package directly:
 
 ```tsx
 import { DevToolbar } from '@solidjs/start-devtools';
