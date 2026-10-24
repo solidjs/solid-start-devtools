@@ -596,6 +596,25 @@ test('shows async loads, waits, fallbacks and chains', async ({ page }) => {
   await expect(page.locator('[data-solid-reactivity-detail]')).toContainText('user');
 });
 
+test('copies a report of the whole session', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const clipboard = () => page.evaluate(() => navigator.clipboard.readText());
+
+  await page.goto('/');
+  await page.locator('#increment-count').click();
+  await page.locator('#emit-warning').click();
+
+  await openTab(page, 'Errors');
+  await page.getByRole('button', { name: 'Copy the whole session for an agent' }).click();
+  await expect.poll(clipboard).toContain('# Solid devtools session');
+  const report = await clipboard();
+  expect(report).toContain('## Issues (1)');
+  expect(report).toContain('`STRICT_READ_UNTRACKED`');
+  expect(report).toContain('## Recent actions, newest first');
+  expect(report).toContain('click on button#increment-count');
+  expect(report).not.toContain('## Errors');
+});
+
 test('copies reports for an agent', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const clipboard = () => page.evaluate(() => navigator.clipboard.readText());
