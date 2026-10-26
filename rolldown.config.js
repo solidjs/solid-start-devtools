@@ -124,4 +124,26 @@ export default defineConfig([
     external,
     plugins: [dts({ emitDtsOnly: true })],
   },
+  // The Vite plugin runs in Node, in the app's Vite config, so it keeps Vite
+  // and Node's modules external.
+  {
+    input: 'src/vite.ts',
+    platform: 'node',
+    output: {
+      format: 'esm',
+      dir: 'dist',
+      entryFileNames: 'vite.js',
+      sourcemap: true,
+    },
+    external: (id) => id === 'vite' || id.startsWith('node:'),
+  },
+  {
+    input: 'src/vite.ts',
+    output: {
+      format: 'esm',
+      dir: 'dist/types',
+    },
+    external: (id) => id === 'vite' || id.startsWith('node:'),
+    plugins: [dts({ emitDtsOnly: true })],
+  },
 ]);
