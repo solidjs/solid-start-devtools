@@ -98,8 +98,9 @@ function render(ctx: Context, node: SerovalNode, seen: number[], depth: number):
       return `Set { ${list(ctx, node.a, next, depth)} }`;
     case 8: {
       const entries = node.e.k.slice(0, MAX_ENTRIES).map((key, index) => {
-        const value = node.e.v[index]!;
-        return `${render(ctx, key, next, depth + 1)} => ${render(ctx, value, next, depth + 1)}`;
+        const name = render(ctx, key, next, depth + 1);
+        if (key.t === 1 && isSensitiveName(key.s)) return `${name} => ${REDACTED}`;
+        return `${name} => ${render(ctx, node.e.v[index]!, next, depth + 1)}`;
       });
       if (node.e.k.length > MAX_ENTRIES) entries.push(`…${node.e.k.length - MAX_ENTRIES} more`);
       return `Map { ${entries.join(', ')} }`;
@@ -140,8 +141,10 @@ function render(ctx: Context, node: SerovalNode, seen: number[], depth: number):
       return `Promise<${result.t === 23 ? 'resolved' : 'rejected'}: ${value}>`;
     }
     case 25: {
-      const entries = Object.entries(node.s).map(
-        ([key, value]) => `${key}: ${render(ctx, value, next, depth + 1)}`,
+      const entries = Object.entries(node.s).map(([key, value]) =>
+        isSensitiveName(key)
+          ? `${key}: ${REDACTED}`
+          : `${key}: ${render(ctx, value, next, depth + 1)}`,
       );
       return `${node.c} { ${entries.join(', ')} }`;
     }
@@ -177,25 +180,27 @@ export async function serovalBodyText(body: ReadableStream<Uint8Array>): Promise
     return node;
   };
 
-  const first = await reader.next();
-  if (first.done || first.value === undefined) return '';
-  const root = read(first.value);
+  try {
+    const first = await reader.next();
+    if (first.done || first.value === undefined) return '';
+    const root = read(first.value);
 
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, STREAM_WAIT_MS);
-  });
-  const rest = (async () => {
-    while (true) {
-      const chunk = await reader.next();
-      if (chunk.done) return;
-      if (chunk.value !== undefined) read(chunk.value);
-    }
-  })().catch(() => {});
-  await Promise.race([rest, timeout]);
-  clearTimeout(timer);
-  // A stream that is still open is left to the call; this copy stops reading.
-  abort.abort();
-
-  return render(ctx, root, [], 0);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, STREAM_WAIT_MS);
+    });
+    const rest = (async () => {
+      while (true) {
+        const chunk = await reader.next();
+        if (chunk.done) return;
+        if (chunk.value !== undefined) read(chunk.value);
+      }
+    })().catch(() => {});
+    await Promise.race([rest, timeout]);
+    clearTimeout(timer);
+    return render(ctx, root, [], 0);
+  } finally {
+    // A stream that is still open is left to the call; this copy stops reading.
+    abort.abort();
+  }
 }

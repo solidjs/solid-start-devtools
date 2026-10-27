@@ -34,9 +34,28 @@ export function code(text: string): string {
   return `${marks}${pad}${text}${pad}${marks}`;
 }
 
+/** Longest line an excerpt keeps, so a minified file does not fill the report. */
+const MAX_LINE = 160;
+
+/**
+ * A line cut to `MAX_LINE` characters around the column (1-based), with the
+ * column moved to match.
+ */
+function clipLine(text: string, column?: number): { text: string; column?: number } {
+  if (text.length <= MAX_LINE) return { text, column };
+  const center = column ? column - 1 - MAX_LINE / 2 : 0;
+  const start = Math.max(0, Math.min(center, text.length - MAX_LINE));
+  const head = start > 0 ? '…' : '';
+  const tail = start + MAX_LINE < text.length ? '…' : '';
+  return {
+    text: `${head}${text.slice(start, start + MAX_LINE)}${tail}`,
+    column: column && column - start + head.length,
+  };
+}
+
 /**
  * The lines around `line` (1-based), numbered, with the line marked by `>` and
- * the column by a caret below it.
+ * the column (1-based) by a caret below it.
  */
 export function excerpt(content: string, line: number, column?: number, radius = 3): string {
   const lines = content.split('\n');
@@ -47,9 +66,10 @@ export function excerpt(content: string, line: number, column?: number, radius =
   for (let current = start; current <= end; current++) {
     const marker = current === line ? '>' : ' ';
     const number = String(current).padStart(width);
-    out.push(`${marker} ${number} | ${lines[current - 1] ?? ''}`.trimEnd());
-    if (current === line && column && column > 0) {
-      out.push(`  ${' '.repeat(width)} | ${' '.repeat(column - 1)}^`);
+    const clipped = clipLine(lines[current - 1] ?? '', current === line ? column : undefined);
+    out.push(`${marker} ${number} | ${clipped.text}`.trimEnd());
+    if (current === line && clipped.column && clipped.column > 0) {
+      out.push(`  ${' '.repeat(width)} | ${' '.repeat(clipped.column - 1)}^`);
     }
   }
   return out.join('\n');

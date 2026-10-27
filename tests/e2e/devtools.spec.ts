@@ -464,6 +464,10 @@ test('copies reports for an agent', async ({ page, context }) => {
   expect(error).toContain('Error: client boom');
   expect(error).toMatch(/`Broken` at `[^`]*app\.tsx:\d+:\d+`/);
   expect(error).toContain("throw new Error('client boom');");
+  // The caret points at the expression that threw.
+  const lines = error.split('\n');
+  const marked = lines.findIndex((line) => line.includes("throw new Error('client boom');"));
+  expect(lines[marked + 1]!.indexOf('^')).toBe(lines[marked]!.indexOf('new'));
 
   // The error replaced the app, so the other panels start from a fresh page.
   await page.reload();

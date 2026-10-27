@@ -110,7 +110,10 @@ export function errorReport(input: ErrorReportInput): string {
           '',
           `### ${code(frameLocation(frame))}`,
           '',
-          fence(excerpt(frame.content!, frame.line!, frame.column), languageOf(frame.file!)),
+          fence(
+            redactText(excerpt(frame.content!, frame.line!, frame.column)),
+            languageOf(frame.file!),
+          ),
         );
       }
     }

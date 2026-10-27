@@ -26,6 +26,13 @@ describe('markdown', () => {
     );
   });
 
+  it('cuts a long line around the column', () => {
+    const line = `${'a'.repeat(300)}X${'b'.repeat(300)}`;
+    const [marked, caret] = excerpt(line, 1, 301, 0).split('\n');
+    expect(marked!.length).toBeLessThan(180);
+    expect(marked![caret!.indexOf('^')]).toBe('X');
+  });
+
   it('shows a path without its origin, /@fs prefix and query', () => {
     expect(displayPath('http://localhost:3000/src/App.tsx?t=123')).toBe('/src/App.tsx');
     expect(displayPath('http://localhost:3000/@fs/Users/me/app/src/App.tsx')).toBe(
@@ -52,6 +59,17 @@ describe('redaction', () => {
     expect(redactText('{ token: "abc", id: "1" }')).toBe('{ token: "[redacted]", id: "1" }');
     expect(redactText('session=abc&page=2')).toBe('session=[redacted]&page=2');
     expect(redactUrl('/login?next=%2F&token=abc')).toBe('/login?next=%2F&token=[redacted]');
+  });
+
+  it('replaces unquoted values, credentials and query pairs in text', () => {
+    expect(redactText('{"password": 123, "id": 1}')).toBe('{"password": [redacted], "id": 1}');
+    expect(redactText('token: abc123')).toBe('token: [redacted]');
+    expect(redactText('Authorization: Bearer abc.def')).toBe('Authorization: Bearer [redacted]');
+    expect(redactText('fn(apiKey=sk-1)')).toBe('fn(apiKey=[redacted])');
+    expect(redactText('<http://h/x?a=1&token=abc>; rel="next"')).toBe(
+      '<http://h/x?a=1&token=[redacted]>; rel="next"',
+    );
+    expect(redactText('user: ada')).toBe('user: ada');
   });
 });
 
@@ -176,6 +194,18 @@ describe('serovalBodyText', () => {
     expect(text).toContain('password: [redacted]');
     expect(text).not.toContain('hunter2');
   });
+
+  it('redacts the values of sensitive Map keys', async () => {
+    const text = await serovalBodyText(
+      serovalStream(
+        new Map([
+          ['token', 'abc'],
+          ['id', 'x'],
+        ]),
+      ),
+    );
+    expect(text).toBe('Map { "token" => [redacted], "id" => "x" }');
+  });
 });
 
 function call(
@@ -229,6 +259,25 @@ describe('serverFunctionReport', () => {
     // The panel reads the original bodies, so the report reads clones.
     expect(instance.request.source.bodyUsed).toBe(false);
     expect(instance.response.source.bodyUsed).toBe(false);
+  });
+
+  it('redacts URLs in headers that are not sensitive by name', () => {
+    const { request } = call(undefined, {});
+    request.source.headers.set('x-return-to', 'http://localhost:3000/cb?access_token=abc');
+    const report = serverFunctionReport({ request, route: '/' });
+    expect(report).toContain('x-return-to: http://localhost:3000/cb?access_token=[redacted]');
+  });
+
+  it('stops reading a body that stays open', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: 1\n'));
+      },
+    });
+    const body = await readReportBody(
+      new Response(stream, { headers: { 'content-type': 'text/event-stream' } }),
+    );
+    expect(body?.text).toBe('data: 1\n\n… the rest of the body was not read');
   });
 
   it('says when the request failed', () => {

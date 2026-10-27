@@ -88,6 +88,52 @@ async function readBody(source: Request | Response): Promise<ReportBody | undefi
   return { format: contentType, text: blobText(await source.blob(), 'Binary') };
 }
 
+/** How long a report waits for a body that is still arriving. */
+const BODY_WAIT_MS = 500;
+/** Most bytes a report reads from one body. */
+const MAX_BODY_BYTES = 1024 * 1024;
+
+/**
+ * The bytes of a body, read until it ends, it passes the size limit or the wait
+ * runs out. A body that streams for the life of the call, such as server-sent
+ * events, is cut off instead of keeping the report waiting.
+ */
+async function readBodyBytes(
+  body: ReadableStream<Uint8Array>,
+): Promise<{ bytes: Uint8Array<ArrayBuffer>; complete: boolean }> {
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  let complete = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), BODY_WAIT_MS);
+  });
+  try {
+    while (size < MAX_BODY_BYTES) {
+      const result = await Promise.race([reader.read(), timeout]);
+      if (!result) break;
+      if (result.done) {
+        complete = true;
+        break;
+      }
+      chunks.push(result.value);
+      size += result.value.byteLength;
+    }
+  } finally {
+    clearTimeout(timer);
+    // This reads a clone, so cancelling it leaves the call alone.
+    reader.cancel().catch(() => {});
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { bytes, complete };
+}
+
 /**
  * The body of a request or response, read from a clone so the panel can still
  * read the original. `undefined` when there is no body, or when it cannot be
@@ -96,8 +142,11 @@ async function readBody(source: Request | Response): Promise<ReportBody | undefi
 export async function readReportBody(source: Request | Response): Promise<ReportBody | undefined> {
   if (!source.body || source.bodyUsed) return undefined;
   try {
-    const body = await readBody(source.clone());
-    return body && { ...body, text: truncateText(body.text) };
+    const { bytes, complete } = await readBodyBytes(source.clone().body!);
+    const body = await readBody(new Response(bytes, { headers: source.headers }));
+    if (!body) return undefined;
+    const text = truncateText(body.text);
+    return { ...body, text: complete ? text : `${text}\n… the rest of the body was not read` };
   } catch {
     return undefined;
   }

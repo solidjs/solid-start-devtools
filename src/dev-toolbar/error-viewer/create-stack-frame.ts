@@ -97,13 +97,15 @@ export function mapStackFrame(current: LoadedStackFrame, isCompiled: boolean): S
         } as StackFrameSource;
       }
     } else {
+      // A stack frame counts columns from 1, and a source map from 0.
       const result = originalPositionFor(sourceMap, {
         line: source.line,
-        column: source.column,
+        column: source.column - 1,
       });
       if (result.source) {
         return {
           ...result,
+          column: result.column + 1,
           content: sourceContentFor(sourceMap, result.source),
         } as StackFrameSource;
       }

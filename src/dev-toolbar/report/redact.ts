@@ -20,11 +20,15 @@ export function truncateText(text: string, max = MAX_TEXT): string {
   return `${text.slice(0, max)}\n… ${text.length - max} more characters`;
 }
 
-/** Header lines, with the value of each sensitive header replaced. */
+/**
+ * Header lines, with the value of each sensitive header replaced. Other values
+ * can hold a URL, such as `referer` or `location`, so their pairs are redacted
+ * too.
+ */
 export function redactHeaders(headers: Headers): string {
   const lines: string[] = [];
   headers.forEach((value, key) => {
-    lines.push(`${key}: ${isSensitiveName(key) ? REDACTED : value}`);
+    lines.push(`${key}: ${isSensitiveName(key) ? REDACTED : redactText(value)}`);
   });
   return lines.join('\n');
 }
@@ -42,19 +46,25 @@ export function redactJson(value: unknown): unknown {
   return value;
 }
 
-// `"key": "value"`, `key: 'value'` and `key=value`, for text that is not JSON.
+// `"key": "value"` and `key: 'value'`, for text that is not JSON.
 const QUOTED_PAIR = /(["']?)([\w-]+)\1(\s*:\s*)("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g;
-const PLAIN_PAIR = /\b([\w-]+)=([^&\s]+)/g;
+// `key: value`, `"key": 123` and `key=value`. The value ends at a space, a
+// delimiter or a query, so a URL's parameters are checked one by one. A quoted
+// or nested value is left to the other patterns.
+const PLAIN_PAIR = /(["']?)\b([\w-]+)\1(\s*[:=]\s*)(?!["'{[])([^\s?&,;"'<>(){}[\]]+)/g;
+// The credentials of an `Authorization` value, wherever it appears.
+const AUTH_SCHEME = /\b(Bearer|Basic)\s+[\w.~+/-]+=*/gi;
 
-/** Text with the values of sensitive `key: value` and `key=value` pairs replaced. */
+/** Text with the values of sensitive `key: value` and `key=value` pairs and credentials replaced. */
 export function redactText(text: string): string {
   return text
     .replace(QUOTED_PAIR, (match, quote: string, key: string, separator: string) =>
       isSensitiveName(key) ? `${quote}${key}${quote}${separator}"${REDACTED}"` : match,
     )
-    .replace(PLAIN_PAIR, (match, key: string) =>
-      isSensitiveName(key) ? `${key}=${REDACTED}` : match,
-    );
+    .replace(PLAIN_PAIR, (match, quote: string, key: string, separator: string) =>
+      isSensitiveName(key) ? `${quote}${key}${quote}${separator}${REDACTED}` : match,
+    )
+    .replace(AUTH_SCHEME, (_, scheme: string) => `${scheme} ${REDACTED}`);
 }
 
 /** A URL with the value of each sensitive query parameter replaced. */
