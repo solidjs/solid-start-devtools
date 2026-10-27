@@ -109,6 +109,63 @@ test('opens the dock from its pull tab', async ({ page }) => {
   await expect(dock).toBeVisible();
 });
 
+test('moves focus with the dock and leaves typing alone', async ({ page }) => {
+  await page.goto('/');
+  const dock = page.getByRole('region', { name: 'Start Devtools' });
+  const handle = page.getByRole('button', { name: 'Open Start Devtools' });
+
+  // Opening focuses the selected tab, and closing focuses the handle.
+  await handle.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('tab', { name: 'Server functions', exact: true })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(page.getByRole('tab', { name: 'Ownership', exact: true })).toBeFocused();
+  await page.keyboard.press('Alt+Shift+KeyD');
+  await expect(dock).toBeHidden();
+  await expect(handle).toBeFocused();
+
+  // The shortcut does nothing inside a text field.
+  await page.evaluate(() => {
+    const input = document.createElement('input');
+    input.id = 'shortcut-input';
+    document.body.append(input);
+  });
+  await page.locator('#shortcut-input').focus();
+  await page.keyboard.press('Alt+Shift+KeyD');
+  await expect(dock).toBeHidden();
+});
+
+test('fits the dock and the padding to the window', async ({ page }) => {
+  // A stored `null` falls back to the defaults.
+  await page.addInitScript(() => localStorage.setItem('solid-start-devtools:dock', 'null'));
+  await page.goto('/');
+  await page.evaluate(() => {
+    const style = document.createElement('style');
+    style.textContent = 'html { padding-bottom: 20px; }';
+    document.head.append(style);
+  });
+  const dock = page.getByRole('region', { name: 'Start Devtools' });
+  await page.getByRole('button', { name: 'Open Start Devtools' }).click();
+  await expect(dock).toBeVisible();
+
+  // The dock's height is added to the page's own padding.
+  const height = (await dock.boundingBox())!.height;
+  expect(await page.evaluate(() => document.documentElement.style.paddingBottom)).toBe(
+    `${height + 20}px`,
+  );
+
+  // A smaller window shrinks the dock to 90% of it, and the padding follows.
+  const viewport = page.viewportSize()!;
+  await page.setViewportSize({ width: viewport.width, height: 300 });
+  await expect.poll(async () => (await dock.boundingBox())!.height).toBe(270);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.style.paddingBottom))
+    .toBe('290px');
+
+  await page.getByRole('button', { name: 'Close Start Devtools' }).click();
+  expect(await page.evaluate(() => document.documentElement.style.paddingBottom)).toBe('');
+});
+
 test('captures client errors', async ({ page }) => {
   await page.goto('/');
   await page.locator('#throw-client-error').click();
