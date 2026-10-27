@@ -1,5 +1,27 @@
 # @solidjs/start-devtools
 
+## 1.0.0-next.7
+
+### Minor Changes
+
+- 3dc8d28: Each panel has a button that copies a Markdown report for an agent such as Claude Code.
+
+  - The error report has the message, the mapped stack and the source around the frames in the app.
+  - The server function report has the status, time, headers and bodies of the call.
+  - The ownership and reactivity reports have the selected node with its values and the nodes around it.
+  - Values with sensitive names, such as `cookie`, `token` or `password`, are redacted.
+
+- a57fe91: Show the devtools in a dock at the bottom of the page.
+
+  - Closed, the dock is a small grip at the bottom center of the page. It grows into a pull tab on hover or focus, and turns red when there are errors. Click it, or drag it up, to open the dock.
+  - Alt+Shift+D opens and closes the dock.
+  - Drag the top edge of the dock to change its height. The page can scroll past it.
+  - A side nav holds the Errors, Server functions, Reactivity and Ownership tabs, with counts of errors and calls.
+  - The header shows the version and the current route.
+  - The dock remembers whether it was open, its tab and its height across reloads.
+  - An error opens the dock on the Errors tab.
+  - Selected tabs, calls and stack frames use a rounded fill instead of a colored left border. Graph nodes show their kind with a colored dot and tint instead of a left border.
+
 ## 1.0.0-next.6
 
 ### Patch Changes

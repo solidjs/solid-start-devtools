@@ -5,6 +5,8 @@
     "@solidjs/start-devtools": "0.0.0"
   },
   "changesets": [
+    "copy-for-agent",
+    "devtools-dock",
     "fresh-tools-observe",
     "initial-release",
     "modern-toolchain",
