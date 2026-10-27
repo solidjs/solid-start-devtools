@@ -5,6 +5,7 @@ import {
   createMemo,
   createSignal,
   Errored,
+  flush,
   For,
   getOwner,
   OBSERVE,
@@ -49,7 +50,9 @@ interface DockState {
 
 function readDockState(): Partial<DockState> {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<DockState>;
+    const value: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+    // Another script can write anything under the key.
+    return value && typeof value === 'object' ? (value as Partial<DockState>) : {};
   } catch {
     // Storage can be blocked. The defaults stay.
     return {};
@@ -64,8 +67,19 @@ function writeDockState(state: DockState): void {
   }
 }
 
-function clampHeight(height: number): number {
-  return Math.round(Math.min(Math.max(height, MIN_HEIGHT), window.innerHeight * 0.9));
+function clampHeight(height: number, max = window.innerHeight * 0.9): number {
+  return Math.round(Math.min(Math.max(height, MIN_HEIGHT), max));
+}
+
+// The shortcut leaves typing alone, since Alt+Shift+D types a character on macOS.
+function isEditable(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  );
 }
 
 function currentRoute(): string {
@@ -104,6 +118,13 @@ export function DevToolbar(props: DevToolbarProps) {
   const [tab, setTab] = createSignal<Tab>('fn');
   const [height, setHeight] = createSignal(DEFAULT_HEIGHT);
   const [route, setRoute] = createSignal('');
+  // The dock keeps the height the user chose, and shows at most 90% of the
+  // window, so a smaller window shrinks it without losing that choice.
+  const [maxHeight, setMaxHeight] = createSignal(Infinity);
+  const dockHeight = createMemo(() => clampHeight(height(), maxHeight()));
+
+  let handle: HTMLButtonElement | undefined;
+  let dock: HTMLDivElement | undefined;
 
   // Writes are batched, so a signal read right after its setter still returns
   // the old value. The caller passes what it just changed.
@@ -118,8 +139,22 @@ export function DevToolbar(props: DevToolbarProps) {
   }
 
   function close() {
+    // The focused control hides with the dock, so focus moves to the handle.
+    const hadFocus = !!dock?.contains(document.activeElement);
     setOpen(false);
     persist({ open: false });
+    if (hadFocus) {
+      flush();
+      handle?.focus();
+    }
+  }
+
+  // Opening from the handle or the shortcut moves focus to the selected tab. An
+  // error opens the dock without moving focus.
+  function openAndFocus() {
+    show(tab());
+    flush();
+    dock?.querySelector<HTMLElement>(`[data-solid-dev-toolbar-tab="${tab()}"]`)?.focus();
   }
 
   // A panel is live only while the dock is open on its tab, so the graph and
@@ -132,6 +167,10 @@ export function DevToolbar(props: DevToolbarProps) {
     if (typeof saved.height === 'number') setHeight(clampHeight(saved.height));
     if (saved.open) setOpen(true);
 
+    const updateMaxHeight = () => setMaxHeight(window.innerHeight * 0.9);
+    updateMaxHeight();
+    window.addEventListener('resize', updateMaxHeight);
+
     // The Navigation API reports client-side navigations. Without it, only
     // history traversal updates the route.
     setRoute(currentRoute());
@@ -140,21 +179,26 @@ export function DevToolbar(props: DevToolbarProps) {
     window.addEventListener('popstate', updateRoute);
     navigation?.addEventListener('currententrychange', updateRoute);
     return () => {
+      window.removeEventListener('resize', updateMaxHeight);
       window.removeEventListener('popstate', updateRoute);
       navigation?.removeEventListener('currententrychange', updateRoute);
     };
   });
 
-  // The page can scroll past the open dock.
+  // The page can scroll past the open dock. The dock's height is added to the
+  // page's own padding, and the padding is put back only if nothing else
+  // changed it meanwhile.
   createEffect(
-    () => (open() ? height() : undefined),
+    () => (open() ? dockHeight() : undefined),
     (value) => {
       if (value === undefined) return;
       const root = document.documentElement;
       const previous = root.style.paddingBottom;
-      root.style.paddingBottom = `${value}px`;
+      const own = parseFloat(getComputedStyle(root).paddingBottom) || 0;
+      const next = `${own + value}px`;
+      root.style.paddingBottom = next;
       return () => {
-        root.style.paddingBottom = previous;
+        if (root.style.paddingBottom === next) root.style.paddingBottom = previous;
       };
     },
   );
@@ -193,20 +237,25 @@ export function DevToolbar(props: DevToolbarProps) {
     const onKeyDown = (event: KeyboardEvent) => {
       // `code`, because Alt changes the character `key` reports on macOS.
       if (!event.altKey || !event.shiftKey || event.code !== 'KeyD') return;
+      if (event.repeat || isEditable(event.composedPath()[0] ?? null)) return;
       event.preventDefault();
       if (open()) close();
-      else show(tab());
+      else openAndFocus();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   });
 
   function onTabKeyDown(event: KeyboardEvent) {
-    const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
-    if (!step) return;
-    event.preventDefault();
     const index = TABS.findIndex((entry) => entry.value === tab());
-    const next = TABS[(index + step + TABS.length) % TABS.length]!;
+    let target: number;
+    if (event.key === 'ArrowDown') target = (index + 1) % TABS.length;
+    else if (event.key === 'ArrowUp') target = (index - 1 + TABS.length) % TABS.length;
+    else if (event.key === 'Home') target = 0;
+    else if (event.key === 'End') target = TABS.length - 1;
+    else return;
+    event.preventDefault();
+    const next = TABS[target]!;
     show(next.value);
     const list = event.currentTarget as HTMLElement;
     list.querySelector<HTMLElement>(`[data-solid-dev-toolbar-tab="${next.value}"]`)?.focus();
@@ -285,6 +334,7 @@ export function DevToolbar(props: DevToolbarProps) {
           {/* The closed dock: a grip on the bottom edge that grows into a pull tab
               on hover or focus, so it covers almost none of the page. */}
           <button
+            ref={handle}
             type="button"
             data-solid-dev-toolbar-handle
             data-errors={errors().length ? '' : undefined}
@@ -296,7 +346,7 @@ export function DevToolbar(props: DevToolbarProps) {
             title="Start Devtools (Alt+Shift+D)"
             hidden={open()}
             onPointerDown={(event) => onDragHeight(event, true)}
-            onClick={() => show(tab())}
+            onClick={openAndFocus}
           >
             <span data-solid-dev-toolbar-handle-grip />
             <span data-solid-dev-toolbar-handle-content>
@@ -313,11 +363,12 @@ export function DevToolbar(props: DevToolbarProps) {
             </span>
           </button>
           <div
+            ref={dock}
             data-solid-dev-toolbar-dock
             role="region"
             aria-label="Start Devtools"
             hidden={!open()}
-            style={{ height: `${height()}px` }}
+            style={{ height: `${dockHeight()}px` }}
           >
             <div
               data-solid-dev-toolbar-resize
@@ -357,6 +408,12 @@ export function DevToolbar(props: DevToolbarProps) {
                         type="button"
                         role="tab"
                         aria-label={entry.label}
+                        // The label names the tab, so the count is read as its description.
+                        aria-describedby={
+                          badge(entry.value)
+                            ? `solid-dev-toolbar-tab-${entry.value}-count`
+                            : undefined
+                        }
                         id={`solid-dev-toolbar-tab-${entry.value}`}
                         aria-controls="solid-dev-toolbar-body"
                         aria-selected={tab() === entry.value ? 'true' : 'false'}
@@ -369,6 +426,7 @@ export function DevToolbar(props: DevToolbarProps) {
                         <Show when={badge(entry.value)}>
                           {(count) => (
                             <span
+                              id={`solid-dev-toolbar-tab-${entry.value}-count`}
                               data-solid-dev-toolbar-tab-badge={
                                 entry.value === 'err' ? 'failure' : undefined
                               }
