@@ -9,6 +9,7 @@ import {
   For,
   getOwner,
   OBSERVE,
+  onCleanup,
   onSettled,
   Show,
 } from 'solid-js';
@@ -16,19 +17,30 @@ import version from '../version.js';
 import IconButton from '../ui/IconButton.js';
 import { type ServerFunctionInstance, ServerFunctionViewer } from './functions/index.js';
 import { captureServerFunctionCall } from './functions/tracker.js';
-import { ErrorIcon, FunctionIcon, GraphIcon, MinimizeIcon, SolidIcon, TreeIcon } from './icons.js';
+import {
+  ErrorIcon,
+  FunctionIcon,
+  GraphIcon,
+  MinimizeIcon,
+  SolidIcon,
+  TreeIcon,
+  IssueIcon,
+} from './icons.js';
 import { excludeOwner, includeOwner } from './ownership/registry.js';
 import { excludeReactiveOwner, includeReactiveOwner } from './reactivity/registry.js';
+import { addIssues, captureIssues, type IssueEntry } from './issues/tracker.js';
 import './index.css';
 
 const ErrorViewer = clientOnly(() => import('./error-viewer/index.js'), { lazy: true });
 const ReactivityViewer = clientOnly(() => import('./reactivity/index.js'), { lazy: true });
 const OwnershipViewer = clientOnly(() => import('./ownership/index.js'), { lazy: true });
+const IssuesViewer = clientOnly(() => import('./issues/index.js'), { lazy: true });
 
-type Tab = 'err' | 'fn' | 'rx' | 'own';
+type Tab = 'err' | 'issues' | 'fn' | 'rx' | 'own';
 
 const TABS: { value: Tab; label: string; icon: typeof ErrorIcon }[] = [
   { value: 'err', label: 'Errors', icon: ErrorIcon },
+  { value: 'issues', label: 'Issues', icon: IssueIcon },
   { value: 'fn', label: 'Server functions', icon: FunctionIcon },
   { value: 'rx', label: 'Reactivity', icon: GraphIcon },
   { value: 'own', label: 'Ownership', icon: TreeIcon },
@@ -301,6 +313,14 @@ export function DevToolbar(props: DevToolbarProps) {
     };
   });
 
+  // Findings arrive while the app renders, before the toolbar settles, so the
+  // channel is joined during setup instead of in `onSettled`.
+  const [issues, setIssues] = createSignal<IssueEntry[]>([]);
+  if (!isServer) {
+    onCleanup(captureIssues((added) => setIssues((current) => addIssues(current, added))));
+  }
+  const issueCount = createMemo(() => issues().reduce((total, entry) => total + entry.count, 0));
+
   const [instances, setInstances] = createSignal<
     Record<string, ServerFunctionInstance | undefined>
   >({});
@@ -323,6 +343,7 @@ export function DevToolbar(props: DevToolbarProps) {
 
   const badge = (value: Tab): number => {
     if (value === 'err') return errors().length;
+    if (value === 'issues') return issueCount();
     if (value === 'fn') return callCount();
     return 0;
   };
@@ -428,7 +449,11 @@ export function DevToolbar(props: DevToolbarProps) {
                             <span
                               id={`solid-dev-toolbar-tab-${entry.value}-count`}
                               data-solid-dev-toolbar-tab-badge={
-                                entry.value === 'err' ? 'failure' : undefined
+                                entry.value === 'err'
+                                  ? 'failure'
+                                  : entry.value === 'issues'
+                                    ? 'warning'
+                                    : undefined
                               }
                             >
                               {count()}
@@ -447,6 +472,19 @@ export function DevToolbar(props: DevToolbarProps) {
                 aria-labelledby={`solid-dev-toolbar-tab-${tab()}`}
               >
                 <ErrorViewer show={visible('err')} errors={errors()} resetError={resetError} />
+                <IssuesViewer
+                  show={visible('issues')}
+                  entries={issues()}
+                  onClear={() => setIssues([])}
+                  onViewOwner={(owner) => {
+                    setOwnershipFocus({ owner });
+                    show('own');
+                  }}
+                  onViewInGraph={(node) => {
+                    setGraphFocus({ node });
+                    show('rx');
+                  }}
+                />
                 <ReactivityViewer
                   show={visible('rx')}
                   focus={graphFocus()}
