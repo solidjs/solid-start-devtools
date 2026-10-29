@@ -5,6 +5,6 @@
 Add fine-grained reactive update highlighter with frequency color progression:
 
 - Toggle via `Alt+Shift+H` shortcut or the highlight icon in the dock toolbar, with state persisted in local storage.
-- Flashes fine-grained DOM mutations in real time, visualizing surgical reactivity where only updating text nodes and SVG icons flash without coarse component bounding boxes.
+- Outlines each DOM change as it happens. A text change gets a box around the changed text only, one per line it covers. Other changes get a box around the element.
 - Frequency-based color progression within an 800ms window: Light Blue (1), Purple (2-3), Pink (4-7), and Red (8+).
-- Pixel-perfect ghost overlay using deep DOM node cloning in a dedicated portal layer, preserving typography, line-height, text transforms, and SVG stroke/fill colors.
+- The boxes are drawn on one canvas in a shadow root, so they add nothing to the page and page styles cannot reach them. They follow the page when it scrolls. One frame draws at most 200 of them, and the fade turns off when the user prefers reduced motion.

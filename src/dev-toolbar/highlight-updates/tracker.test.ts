@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   getFlashColors,
   INACTIVITY_RESET_MS,
+  MAX_UPDATES_PER_FRAME,
   type UpdateEvent,
   UpdateHighlightTracker,
 } from './tracker.js';
@@ -77,5 +78,31 @@ describe('UpdateHighlightTracker', () => {
     expect(events[2].count).toBe(1);
 
     vi.useRealTimers();
+  });
+
+  it('reports at most MAX_UPDATES_PER_FRAME updates in one frame', () => {
+    let frame: (() => void) | undefined;
+    const win = {
+      requestAnimationFrame: (callback: () => void) => {
+        frame = callback;
+        return 1;
+      },
+    } as unknown as Window;
+    const tracker = new UpdateHighlightTracker(win);
+    const events: UpdateEvent[] = [];
+    tracker.subscribe((event) => {
+      events.push(event);
+    });
+
+    const pending = (tracker as unknown as { pendingNodes: Set<Node> }).pendingNodes;
+    for (let i = 0; i < MAX_UPDATES_PER_FRAME + 50; i++) {
+      pending.add(createMockTextNode(String(i)));
+    }
+    (tracker as unknown as { scheduleFlush: () => void }).scheduleFlush();
+    frame?.();
+
+    expect(events).toHaveLength(MAX_UPDATES_PER_FRAME);
+    expect(pending.size).toBe(0);
+    tracker.stop();
   });
 });

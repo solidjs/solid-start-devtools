@@ -280,35 +280,37 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                     </Placeholder>
                   }
                 >
-                  <For each={rows()}>
+                  <For each={rows()} keyed={(row) => row.node.id}>
                     {(row) => (
                       <div
                         data-solid-ownership-row
-                        data-owner-id={row.node.id}
-                        data-selected={selected() === row.node.id ? '' : undefined}
+                        data-owner-id={row().node.id}
+                        data-selected={selected() === row().node.id ? '' : undefined}
                         data-fresh={
-                          Date.now() - (firstSeen.get(row.node.id) ?? 0) < FRESH_MS ? '' : undefined
+                          Date.now() - (firstSeen.get(row().node.id) ?? 0) < FRESH_MS
+                            ? ''
+                            : undefined
                         }
-                        style={{ 'padding-left': `${row.indent * 0.875 + 0.25}rem` }}
+                        style={{ 'padding-left': `${row().indent * 0.875 + 0.25}rem` }}
                       >
                         <button
                           type="button"
                           data-solid-ownership-chevron
-                          data-leaf={row.expandable ? undefined : ''}
-                          data-expanded={row.expanded ? '' : undefined}
-                          aria-label={row.expanded ? 'Collapse' : 'Expand'}
-                          onClick={() => row.expandable && toggle(row.node.id)}
+                          data-leaf={row().expandable ? undefined : ''}
+                          data-expanded={row().expanded ? '' : undefined}
+                          aria-label={row().expanded ? 'Collapse' : 'Expand'}
+                          onClick={() => row().expandable && toggle(row().node.id)}
                         />
                         <button
                           type="button"
                           data-solid-ownership-label
                           onClick={() =>
                             setSelected((current) =>
-                              current === row.node.id ? undefined : row.node.id,
+                              current === row().node.id ? undefined : row().node.id,
                             )
                           }
                         >
-                          <span data-solid-ownership-kind={row.node.kind} />
+                          <span data-solid-ownership-kind={row().node.kind} />
                           <Text
                             data-solid-ownership-name
                             options={{
@@ -318,9 +320,9 @@ export default function OwnershipViewer(props: OwnershipViewerProps): JSX.Elemen
                               wrap: 'nowrap',
                             }}
                           >
-                            {row.node.name}
+                            {row().node.name}
                           </Text>
-                          <Show when={row.node.disposed}>
+                          <Show when={row().node.disposed}>
                             <Badge type="failure">disposed</Badge>
                           </Show>
                         </button>
