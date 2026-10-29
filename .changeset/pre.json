@@ -7,8 +7,11 @@
   "changesets": [
     "copy-for-agent",
     "devtools-dock",
+    "element-inspector",
     "fresh-tools-observe",
+    "highlight-updates",
     "initial-release",
+    "keyed-panel-rows",
     "modern-toolchain",
     "native-oxc-toolchain",
     "ownership-tree",
