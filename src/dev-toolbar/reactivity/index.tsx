@@ -556,13 +556,13 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
                           <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
                         </marker>
                       </defs>
-                      <For each={visibleEdges()}>
+                      <For each={visibleEdges()} keyed={(edge) => `${edge.from}>${edge.to}`}>
                         {(edge) => {
-                          const role = () => edgeRoleOf(edge);
+                          const role = () => edgeRoleOf(edge());
                           return (
-                            <Show when={layout().nodes.get(edge.from)}>
+                            <Show when={layout().nodes.get(edge().from)}>
                               {(from) => (
-                                <Show when={layout().nodes.get(edge.to)}>
+                                <Show when={layout().nodes.get(edge().to)}>
                                   {(to) => (
                                     <path
                                       data-solid-reactivity-edge={role()}
@@ -582,39 +582,41 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
                       </For>
                     </svg>
 
-                    <For each={visibleNodes()}>
+                    <For each={visibleNodes()} keyed={(node) => node.id}>
                       {(node) => (
-                        <Show when={layout().nodes.get(node.id)}>
+                        <Show when={layout().nodes.get(node().id)}>
                           {(position) => (
                             <button
                               type="button"
-                              data-solid-reactivity-node={roleOf(node.id)}
-                              data-kind={node.kind}
-                              data-state={node.state}
-                              data-pending={node.pending ? '' : undefined}
-                              data-errored={node.errored ? '' : undefined}
-                              data-fresh={Date.now() - node.updatedAt < 700 ? '' : undefined}
+                              data-solid-reactivity-node={roleOf(node().id)}
+                              data-kind={node().kind}
+                              data-state={node().state}
+                              data-pending={node().pending ? '' : undefined}
+                              data-errored={node().errored ? '' : undefined}
+                              data-fresh={Date.now() - node().updatedAt < 700 ? '' : undefined}
                               style={{
                                 transform: `translate(${position().x}px, ${position().y}px)`,
                                 width: `${NODE_WIDTH}px`,
                                 height: `${NODE_HEIGHT}px`,
                               }}
-                              onPointerEnter={() => setHovered(node.id)}
+                              onPointerEnter={() => setHovered(node().id)}
                               onPointerLeave={() =>
-                                setHovered((current) => (current === node.id ? undefined : current))
+                                setHovered((current) =>
+                                  current === node().id ? undefined : current,
+                                )
                               }
                               onClick={() =>
                                 setSelected((current) =>
-                                  current === node.id ? undefined : node.id,
+                                  current === node().id ? undefined : node().id,
                                 )
                               }
                             >
-                              <span data-solid-reactivity-node-name>{node.name}</span>
+                              <span data-solid-reactivity-node-name>{node().name}</span>
                               <span data-solid-reactivity-node-value>
-                                {formatValue(node.value)}
+                                {formatValue(node().value)}
                               </span>
-                              <Show when={node.updates > 0}>
-                                <span data-solid-reactivity-node-updates>{node.updates}</span>
+                              <Show when={node().updates > 0}>
+                                <span data-solid-reactivity-node-updates>{node().updates}</span>
                               </Show>
                             </button>
                           )}
