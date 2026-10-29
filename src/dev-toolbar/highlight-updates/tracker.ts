@@ -37,6 +37,8 @@ export function getFlashColors(count: number): HighlightColors {
 
 export const FADE_OUT_DURATION_MS = 400;
 export const INACTIVITY_RESET_MS = 800;
+/** The most updates one frame reports, so a large change does not stall the page. */
+export const MAX_UPDATES_PER_FRAME = 200;
 
 export interface UpdateEvent {
   node: Node;
@@ -190,9 +192,12 @@ export class UpdateHighlightTracker {
     if (this.rafId !== null || !this.windowObj) return;
     this.rafId = this.windowObj.requestAnimationFrame(() => {
       this.rafId = null;
+      let reported = 0;
       for (const node of this.pendingNodes) {
+        if (reported >= MAX_UPDATES_PER_FRAME) break;
         if (node.isConnected) {
           this.recordNodeUpdate(node);
+          reported++;
         }
       }
       this.pendingNodes.clear();

@@ -514,21 +514,49 @@ test('highlights fine-grained reactive updates with frequency colors', async ({ 
   await highlightButton.click();
   await expect(highlightButton).toHaveAttribute('data-active', '');
 
-  // 2. Trigger an update on the Counter component.
-  await page.locator('#increment-count').click();
+  // 2. Update the Counter, then read the overlay canvas in the middle of the
+  // changed text and in the button's padding beside it. The click and the
+  // reads run in one step, so the box cannot fade out in between.
+  const updateAndSample = () =>
+    page.evaluate(async () => {
+      const button = document.querySelector<HTMLButtonElement>('#increment-count')!;
+      button.click();
+      // One frame for the tracker to collect the change, one to draw it, one to
+      // be sure the draw ran before the reads.
+      for (let i = 0; i < 3; i++) await new Promise((resolve) => requestAnimationFrame(resolve));
+      const canvas = document
+        .querySelector('[data-solid-highlight-overlay]')!
+        .shadowRoot!.querySelector('canvas')!;
+      const ctx = canvas.getContext('2d')!;
+      const scale = canvas.width / window.innerWidth;
+      const pixel = (x: number, y: number) => [
+        ...ctx.getImageData(Math.round(x * scale), Math.round(y * scale), 1, 1).data,
+      ];
+      const range = document.createRange();
+      range.selectNodeContents(button.firstChild!);
+      const text = range.getBoundingClientRect();
+      const outer = button.getBoundingClientRect();
+      return {
+        text: pixel(text.left + text.width / 2, text.top + text.height / 2),
+        padding: pixel((outer.left + text.left) / 2, text.top + text.height / 2),
+      };
+    });
 
-  // Ghost clone appears overlaying the exact text in-place.
-  const flash = page.locator('[data-solid-flash-clone]');
-  await expect(flash).toBeVisible();
-  await expect(flash).toContainText('count 1');
-  // First update is Solid light blue (#4483ec / rgb(68, 131, 236)).
-  const highlighted = flash.locator('span[style*="color"]');
-  expect(await highlighted.evaluate((el) => el.style.color)).toBe('rgb(68, 131, 236)');
+  // The canvas stores colors with premultiplied alpha, so a read can be off by one.
+  const expectColor = (pixel: number[], rgb: number[]) => {
+    for (let i = 0; i < 3; i++) expect(Math.abs(pixel[i]! - rgb[i]!)).toBeLessThanOrEqual(3);
+  };
+
+  // First update is Solid light blue (#4483ec / rgb(68, 131, 236)), on the
+  // text only.
+  const first = await updateAndSample();
+  expectColor(first.text, [68, 131, 236]);
+  expect(first.text[3]).toBeGreaterThan(0);
+  expect(first.padding[3]).toBe(0);
 
   // 3. Fast repeated update elevates color to purple (#9333ea / rgb(147, 51, 234)).
-  await page.locator('#increment-count').click();
-  await expect(flash).toContainText('count 2');
-  expect(await highlighted.evaluate((el) => el.style.color)).toBe('rgb(147, 51, 234)');
+  const second = await updateAndSample();
+  expectColor(second.text, [147, 51, 234]);
 
   // 4. Toggle off with shortcut Alt+Shift+H.
   await page.keyboard.press('Alt+Shift+H');
