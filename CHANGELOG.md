@@ -1,5 +1,29 @@
 # @solidjs/start-devtools
 
+## 1.0.0-next.8
+
+### Minor Changes
+
+- 47f4e1e: Add interactive Element Inspector and cross-panel component funneling:
+
+  - Press `Alt+Shift+C` or click the crosshair icon in the dock header to inspect DOM elements.
+  - Hovering elements shows an overlay with the component name, file location, and dimensions.
+  - Clicking an element selects the component and funnels relevant data across devtool panels without interrupting your active view.
+  - Reactivity graph filters to reactive signals, memos, and computations owned by the selected component instance.
+  - Ownership tree automatically expands, scrolls to, and highlights the selected component.
+  - The funnel badge in the dock header provides quick navigation to the Ownership tree, direct "See in editor" launch, and 1-click filter clearing.
+
+- 0562bea: Add fine-grained reactive update highlighter with frequency color progression:
+
+  - Toggle via `Alt+Shift+H` shortcut or the highlight icon in the dock toolbar, with state persisted in local storage.
+  - Outlines each DOM change as it happens. A text change gets a box around the changed text only, one per line it covers. Other changes get a box around the element.
+  - Frequency-based color progression within an 800ms window: Light Blue (1), Purple (2-3), Pink (4-7), and Red (8+).
+  - The boxes are drawn on one canvas in a shadow root, so they add nothing to the page and page styles cannot reach them. They follow the page when it scrolls. One frame draws at most 200 of them, and the fade turns off when the user prefers reduced motion.
+
+### Patch Changes
+
+- d66c2ed: The Ownership tree rows and the Reactivity graph nodes and edges are now matched by id between refreshes. Before, every refresh rebuilt all of them, so an app that writes a signal every frame kept the page at about 15 to 20 frames per second while one of these panels was open.
+
 ## 1.0.0-next.7
 
 ### Minor Changes
