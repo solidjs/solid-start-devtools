@@ -543,6 +543,65 @@ test('highlights fine-grained reactive updates with frequency colors', async ({ 
   ).toHaveAttribute('data-active', '');
 });
 
+test('inspects elements and funnels components across panels', async ({ page }) => {
+  await page.goto('/');
+
+  // Open the devtools dock.
+  await page.getByRole('button', { name: 'Open Start Devtools' }).click();
+  const inspectButton = page.getByRole('button', { name: 'Inspect element (Alt+Shift+C)' });
+  await expect(inspectButton).toBeVisible();
+
+  // 1. Toggle inspect mode with the header button.
+  await inspectButton.click();
+  await expect(inspectButton).toHaveAttribute('data-active', '');
+
+  // 2. Hover over a component's DOM element (<Counter />'s button).
+  await page.locator('#increment-count').hover();
+  const overlay = page.locator('[data-solid-inspector-overlay]');
+  await expect(overlay).toBeVisible();
+  await expect(page.locator('[data-solid-inspector-badge-name]')).toHaveText('<Counter>');
+  await expect(page.locator('[data-solid-inspector-box]')).toBeVisible();
+  await expect(page.locator('[data-solid-inspector-badge-size]')).toBeVisible();
+
+  // 3. Click to select the component.
+  await page.locator('#increment-count').click();
+  await expect(overlay).toBeHidden();
+  await expect(inspectButton).not.toHaveAttribute('data-active', '');
+
+  // 4. Verify the funnel badge appears in the header.
+  const funnel = page.locator('[data-solid-dev-toolbar-funnel]');
+  await expect(funnel).toBeVisible();
+  const funnelName = page.locator('[data-solid-dev-toolbar-funnel-name]');
+  await expect(funnelName).toHaveText('<Counter>');
+
+  // 5. Clicking the component name in the funnel jumps to the Ownership tree.
+  await funnelName.click();
+  await expect(page.getByRole('tab', { name: 'Ownership' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.locator('[data-solid-ownership-row][data-selected]')).toContainText('Counter');
+  await expect(page.locator('[data-solid-ownership-detail]')).toBeVisible();
+
+  // 6. Switching to Reactivity isolates nodes belonging to the selected owner instance.
+  await page.getByRole('tab', { name: 'Reactivity' }).click();
+  const graphNodes = page.locator('[data-solid-reactivity-node-name]');
+  await expect(graphNodes.filter({ hasText: 'count' })).toBeVisible();
+
+  // 7. Clear the funnel.
+  await page.getByRole('button', { name: 'Clear component funnel' }).click();
+  await expect(funnel).toHaveCount(0);
+
+  // 8. Test keyboard shortcut Alt+Shift+C and Escape cancel.
+  await page.keyboard.press('Alt+Shift+C');
+  await expect(inspectButton).toHaveAttribute('data-active', '');
+  await page.locator('#fixture-greeting').hover();
+  await expect(page.locator('[data-solid-inspector-badge-name]')).toHaveText('<Greeting>');
+  await page.keyboard.press('Escape');
+  await expect(inspectButton).not.toHaveAttribute('data-active', '');
+  await expect(overlay).toBeHidden();
+});
+
 test('mounts once and disposes', async ({ page }) => {
   await page.goto('/?mount');
 

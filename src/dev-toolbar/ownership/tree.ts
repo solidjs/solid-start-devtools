@@ -143,7 +143,7 @@ export function ownerName(owner: RawNode, kind: OwnerKind): string {
  * The hot reload transform records this on its wrapper, so it is there whenever
  * a build runs that transform. Components compiled without it have no location.
  */
-function componentLocation(owner: RawNode): string | undefined {
+export function componentLocation(owner: RawNode): string | undefined {
   try {
     const location = owner._component?.fn?.location;
     return typeof location === 'string' && location.length > 0 ? location : undefined;

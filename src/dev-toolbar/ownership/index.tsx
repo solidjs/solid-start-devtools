@@ -5,6 +5,7 @@ import IconButton from '../../ui/IconButton.js';
 import Placeholder from '../../ui/Placeholder.js';
 import { Text } from '../../ui/Text.js';
 import { CollapseIcon, ExpandIcon, EyeIcon, PauseIcon, PlayIcon } from '../icons.js';
+import { openInEditor } from '../open-in-editor.js';
 import { CopyReportButton } from '../report/CopyReportButton.js';
 import { pageRoute } from '../report/markdown.js';
 import { ownerReport } from '../report/owner-report.js';
@@ -29,14 +30,6 @@ import './styles.css';
 /** Owners the reactivity graph draws. Components, roots and plain scopes hold no value. */
 function isInGraph(kind: OwnerKind): boolean {
   return kind !== 'component' && kind !== 'root' && kind !== 'scope';
-}
-
-/**
- * Asks the dev server to open the file. Vite serves this endpoint in
- * development. A failure is ignored, since the panel has nowhere to report it.
- */
-function openInEditor(location: string): void {
-  void fetch(`/__open-in-editor?file=${encodeURIComponent(location)}`).catch(() => {});
 }
 
 /** How long a row stays marked as new after it first appears. */

@@ -1,0 +1,50 @@
+[data-solid-inspector-overlay] {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483646;
+}
+
+[data-solid-inspector-box] {
+  position: fixed;
+  box-sizing: border-box;
+  pointer-events: none;
+  border-radius: 4px;
+  background: oklch(0.68 0.13 245 / 0.16);
+  border: 1.5px solid oklch(0.68 0.13 245);
+  box-shadow: 0 0 0 1px oklch(0.68 0.13 245 / 0.35);
+  transition: all 60ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-solid-inspector-badge] {
+  position: fixed;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  background: var(--start-dt-surface, oklch(0.22 0.02 265));
+  border: 1px solid var(--start-dt-border, oklch(0.34 0.02 265));
+  box-shadow: 0 6px 16px oklch(0 0 0 / 0.4);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--start-dt-text, oklch(0.93 0.005 265));
+  white-space: nowrap;
+  z-index: 2147483647;
+}
+
+[data-solid-inspector-badge-name] {
+  font-weight: 600;
+  color: var(--start-dt-accent, oklch(0.68 0.13 245));
+}
+
+[data-solid-inspector-badge-loc] {
+  color: var(--start-dt-text-muted, oklch(0.68 0.015 265));
+}
+
+[data-solid-inspector-badge-size] {
+  color: var(--start-dt-text-muted, oklch(0.68 0.015 265));
+  opacity: 0.75;
+}

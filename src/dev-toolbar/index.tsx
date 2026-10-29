@@ -21,11 +21,15 @@ import {
   FunctionIcon,
   GraphIcon,
   HighlightUpdatesIcon,
+  InspectIcon,
   MinimizeIcon,
   SolidIcon,
   TreeIcon,
 } from './icons.js';
 import { HighlightUpdatesOverlay } from './highlight-updates/overlay.js';
+import { installElementTracking, type InspectedComponent } from './inspector/lookup.js';
+import { InspectorOverlay } from './inspector/overlay.js';
+import { openInEditor } from './open-in-editor.js';
 import { excludeOwner, includeOwner } from './ownership/registry.js';
 import { excludeReactiveOwner, includeReactiveOwner } from './reactivity/registry.js';
 import './index.css';
@@ -129,6 +133,27 @@ export function DevToolbar(props: DevToolbarProps) {
   const [height, setHeight] = createSignal(DEFAULT_HEIGHT);
   const [highlightUpdates, setHighlightUpdates] = createSignal(false);
   const [route, setRoute] = createSignal('');
+  const [inspecting, setInspecting] = createSignal(false);
+  const [selectedComponent, setSelectedComponent] = createSignal<InspectedComponent | undefined>();
+
+  function toggleInspect() {
+    setInspecting((current) => !current);
+  }
+
+  function selectComponent(comp: InspectedComponent) {
+    setInspecting(false);
+    setSelectedComponent(comp);
+    setOwnershipFocus({ owner: comp.owner });
+    if (!open()) {
+      setOpen(true);
+      persist({ open: true });
+    }
+  }
+
+  function clearComponentFunnel() {
+    setSelectedComponent(undefined);
+  }
+
   // The dock keeps the height the user chose, and shows at most 90% of the
   // window, so a smaller window shrinks it without losing that choice.
   const [maxHeight, setMaxHeight] = createSignal(Infinity);
@@ -252,6 +277,10 @@ export function DevToolbar(props: DevToolbarProps) {
   }
 
   onSettled(() => {
+    installElementTracking();
+  });
+
+  onSettled(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       // `code`, because Alt changes the character `key` reports on macOS.
       if (!event.altKey || !event.shiftKey) return;
@@ -268,6 +297,9 @@ export function DevToolbar(props: DevToolbarProps) {
           persist({ highlightUpdates: next });
           return next;
         });
+      } else if (event.code === 'KeyC') {
+        event.preventDefault();
+        toggleInspect();
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -416,7 +448,54 @@ export function DevToolbar(props: DevToolbarProps) {
               <span data-solid-dev-toolbar-route title="Current route">
                 {route()}
               </span>
+              <Show when={selectedComponent()}>
+                {(comp) => (
+                  <div data-solid-dev-toolbar-funnel>
+                    <span data-solid-dev-toolbar-funnel-label>Inspecting</span>
+                    <button
+                      type="button"
+                      data-solid-dev-toolbar-funnel-name
+                      title={`View ${comp().name} in ownership tree`}
+                      onClick={() => {
+                        setOwnershipFocus({ owner: comp().owner });
+                        show('own');
+                      }}
+                    >
+                      {comp().name}
+                    </button>
+                    <Show when={comp().location}>
+                      {(loc) => (
+                        <button
+                          type="button"
+                          data-solid-dev-toolbar-funnel-action
+                          title={`Open ${loc()} in editor`}
+                          onClick={() => openInEditor(loc())}
+                        >
+                          Open in editor
+                        </button>
+                      )}
+                    </Show>
+                    <button
+                      type="button"
+                      data-solid-dev-toolbar-funnel-clear
+                      title="Clear component funnel"
+                      aria-label="Clear component funnel"
+                      onClick={clearComponentFunnel}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </Show>
               <div data-solid-dev-toolbar-spacer />
+              <IconButton
+                onClick={toggleInspect}
+                data-active={inspecting() ? '' : undefined}
+                aria-label="Inspect element (Alt+Shift+C)"
+                title="Inspect element (Alt+Shift+C)"
+              >
+                <InspectIcon title="Inspect element (Alt+Shift+C)" />
+              </IconButton>
               <IconButton
                 title="Highlight updates (Alt+Shift+H)"
                 aria-label="Highlight updates (Alt+Shift+H)"
@@ -493,6 +572,8 @@ export function DevToolbar(props: DevToolbarProps) {
                 <ReactivityViewer
                   show={visible('rx')}
                   focus={graphFocus()}
+                  ownerFilter={selectedComponent()?.owner}
+                  componentFilter={selectedComponent()?.name}
                   onViewOwner={(owner) => {
                     setOwnershipFocus({ owner });
                     show('own');
@@ -522,6 +603,11 @@ export function DevToolbar(props: DevToolbarProps) {
           </div>
         </div>
         <HighlightUpdatesOverlay active={highlightUpdates()} />
+        <InspectorOverlay
+          active={inspecting()}
+          onSelect={selectComponent}
+          onCancel={() => setInspecting(false)}
+        />
       </Portal>
       <Errored
         fallback={(error) => {
