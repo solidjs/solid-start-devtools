@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, Loading, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, Loading, onSettled, Show } from 'solid-js';
 import { createOrder, SEED_ORDERS, type Order, type OrderStatus } from './orders.js';
 import { reportCall } from './report-call.js';
 import './styles.css';
@@ -22,6 +22,41 @@ async function loadRate(currency: string): Promise<{ currency: string; rate: num
 
 function Boom(): never {
   throw new Error('The demo threw this on purpose.');
+}
+
+/**
+ * Updates on every animation frame while it runs: a counter for a text
+ * change, and a dot whose style changes for an element change. Useful to
+ * watch the update highlight while scrolling or resizing.
+ */
+function Ticker() {
+  const [running, setRunning] = createSignal(true, { name: 'ticker-running' });
+  const [frame, setFrame] = createSignal(0, { name: 'ticker-frame' });
+
+  onSettled(() => {
+    let id = requestAnimationFrame(function tick() {
+      if (running()) setFrame((value) => value + 1);
+      id = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(id);
+  });
+
+  return (
+    <article class="stat">
+      <span class="stat-label">Frames</span>
+      <span class="stat-value">{frame()}</span>
+      <div class="ticker-track">
+        <div class="ticker-dot" style={{ left: `${(frame() % 120) / 1.2}%` }} />
+      </div>
+      <button
+        type="button"
+        class="link ticker-toggle"
+        onClick={() => setRunning((value) => !value)}
+      >
+        {running() ? 'Pause' : 'Play'}
+      </button>
+    </article>
+  );
 }
 
 export default function App() {
@@ -143,6 +178,7 @@ export default function App() {
           </Loading>
           <span class="stat-note">server function through an async memo</span>
         </article>
+        <Ticker />
       </section>
 
       <section class="controls">
