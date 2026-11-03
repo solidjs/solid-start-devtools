@@ -1,4 +1,10 @@
-import { BODY_FORMAT_FILE_KEY, BODY_FORMAT_KEY, BodyFormat } from '../functions/body-format.js';
+import {
+  BODY_FORMAT_FILE_KEY,
+  BODY_FORMAT_KEY,
+  BodyFormat,
+  isUploadBody,
+  splitUploadBody,
+} from '../functions/body-format.js';
 import type { ServerFunctionRequest, ServerFunctionResponse } from '../functions/tracker.js';
 import { code, fence } from './markdown.js';
 import {
@@ -60,6 +66,11 @@ async function readBody(source: Request | Response): Promise<ReportBody | undefi
   const format = source.headers.get(BODY_FORMAT_KEY);
   const contentType = source.headers.get('Content-Type') ?? '';
   switch (true) {
+    case isUploadBody(source.headers): {
+      const { args, files } = await splitUploadBody(source);
+      const text = redactText(await serovalBodyText(new Response(args).body!));
+      return { format: 'seroval with files', text: `${text}\n\n${formDataText(files)}` };
+    }
     case format === BodyFormat.Serialized:
       return { format: 'seroval', text: redactText(await serovalBodyText(source.body!)) };
     case format === BodyFormat.Json:

@@ -280,6 +280,25 @@ describe('serverFunctionReport', () => {
     expect(body?.text).toBe('data: 1\n\n… the rest of the body was not read');
   });
 
+  it('reads the arguments and files of an upload', async () => {
+    // `enableRichArguments` sends arguments holding files as multipart form
+    // data, still marked `Serialized`.
+    const form = new FormData();
+    form.set('args', await new Response(serovalStream([{ note: 'hi', token: 'abc' }])).text());
+    form.set('file0', new Blob(['hello'], { type: 'text/plain' }), 'a.txt');
+    const body = await readReportBody(
+      new Request('http://localhost:3000/_server', {
+        method: 'POST',
+        body: form,
+        headers: { [BODY_FORMAT_KEY]: BodyFormat.Serialized },
+      }),
+    );
+    expect(body?.format).toBe('seroval with files');
+    expect(body?.text).toContain('[{ note: "hi", token: [redacted] }]');
+    expect(body?.text).toContain('file0: <File "a.txt", 5 bytes, text/plain>');
+    expect(body?.text).not.toContain('abc');
+  });
+
   it('says when the request failed', () => {
     const { request } = call(undefined, {});
     const report = serverFunctionReport({

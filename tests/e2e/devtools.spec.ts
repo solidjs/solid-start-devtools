@@ -240,6 +240,26 @@ test('shows server-function calls', async ({ page }) => {
   expect(warnings).not.toContainEqual(expect.stringContaining('STRICT_READ_UNTRACKED'));
 });
 
+test('shows the arguments and files of an upload call', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+
+  await page.goto('/');
+  await page.locator('#emit-upload-request').click();
+  await openTab(page, 'Server functions');
+  await page
+    .locator('[data-solid-functions-instances] [data-solid-select-option]', {
+      hasText: 'uploadAvatar',
+    })
+    .click();
+
+  const detail = page.locator('[data-solid-functions-detail]');
+  await expect(detail.locator('[data-solid-seroval-viewer]')).toContainText('note');
+  await expect(detail.locator('[data-solid-form-data-viewer]')).toContainText('file0');
+  await expect(detail.locator('[data-solid-blob-viewer-name]')).toContainText('avatar.txt');
+  expect(errors).toEqual([]);
+});
+
 test('maps the reactivity graph', async ({ page }) => {
   await page.goto('/');
   const nodes = page.locator('[data-solid-reactivity-node]');

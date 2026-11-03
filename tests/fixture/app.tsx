@@ -1,5 +1,6 @@
 import { render } from '@solidjs/web';
 import { DevToolbar, mountDevToolbar, pushServerFunctionCall } from '@solidjs/start-devtools';
+import { serializeString } from '@solidjs/web/server-functions/client';
 import { createEffect, createMemo, createSignal, Show } from 'solid-js';
 
 function Broken(): never {
@@ -30,6 +31,25 @@ function emitServerFunctionResponse() {
     time: 20,
   });
   responseStatus = 500;
+}
+
+// A call whose arguments hold a file, as `enableRichArguments` sends it.
+async function emitUploadRequest() {
+  const form = new FormData();
+  form.set('args', await serializeString([{ note: 'avatar' }]));
+  form.set('file0', new Blob(['hello'], { type: 'text/plain' }), 'avatar.txt');
+  pushServerFunctionCall({
+    type: 'request',
+    id: 'upload-avatar',
+    instance: 'upload-avatar-1',
+    source: new Request('/_server', {
+      method: 'POST',
+      body: form,
+      headers: { 'X-Server-Function-Format': '0' },
+    }),
+    meta: { name: 'uploadAvatar' },
+    time: 30,
+  });
 }
 
 function Greeting(props: { name: string }) {
@@ -68,6 +88,9 @@ function App() {
       </button>
       <button id="emit-server-function-response" onClick={emitServerFunctionResponse}>
         emit server function response
+      </button>
+      <button id="emit-upload-request" onClick={emitUploadRequest}>
+        emit upload request
       </button>
       <button id="throw-client-error" onClick={() => setBroken(true)}>
         throw client error

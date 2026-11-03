@@ -1,6 +1,12 @@
 import { createMemo, createSignal, For, Loading, Show } from 'solid-js';
 import type { JSX } from '@solidjs/web';
-import { BODY_FORMAT_FILE_KEY, BODY_FORMAT_KEY, BodyFormat } from './body-format.js';
+import {
+  BODY_FORMAT_FILE_KEY,
+  BODY_FORMAT_KEY,
+  BodyFormat,
+  isUploadBody,
+  splitUploadBody,
+} from './body-format.js';
 import { Badge } from '../../ui/Badge.js';
 import IconButton from '../../ui/IconButton.js';
 import Placeholder from '../../ui/Placeholder.js';
@@ -63,6 +69,28 @@ async function getURLSearchParams(source: Response | Request): Promise<URLSearch
   return new URLSearchParams(text);
 }
 
+interface UploadViewerProps {
+  source: Request | Response;
+}
+
+// The arguments of a call that sends files, with its files beside them.
+function UploadViewer(props: UploadViewerProps): JSX.Element {
+  const parts = createMemo(() => splitUploadBody(props.source));
+
+  return (
+    <Loading>
+      <Show when={parts()} keyed>
+        {(current) => (
+          <>
+            <SerovalViewer stream={new Response(current.args)} />
+            <FormDataViewer source={current.files} />
+          </>
+        )}
+      </Show>
+    </Loading>
+  );
+}
+
 interface ContentViewerProps {
   source: ServerFunctionRequest | ServerFunctionResponse;
 }
@@ -77,6 +105,8 @@ function ContentViewer(props: ContentViewerProps): JSX.Element {
     const startType = source.headers.get(BODY_FORMAT_KEY);
     const contentType = source.headers.get('Content-Type');
     switch (true) {
+      case isUploadBody(source.headers):
+        return <UploadViewer source={source} />;
       case startType === BodyFormat.Serialized:
         return <SerovalViewer stream={source} />;
       case startType === BodyFormat.Json:
