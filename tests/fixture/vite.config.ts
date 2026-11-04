@@ -53,7 +53,6 @@ function fakeDevServer(): Plugin {
     configureServer(server) {
       server.ws.on('solid:devtools:hello', (hello: { since: number }, client) => {
         client.send('solid:devtools:info', {
-          base: '/',
           versions: { 'solid-js': 'from-dev-server' },
           errors: [
             {

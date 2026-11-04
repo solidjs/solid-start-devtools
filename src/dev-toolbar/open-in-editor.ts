@@ -8,12 +8,8 @@ import { devServerInfo } from './dev-server.js';
  * path against the Vite root, so one request is enough.
  */
 export function openInEditor(location: string): void {
-  const info = devServerInfo();
-  if (info) {
-    const base = info.base.endsWith('/') ? info.base.slice(0, -1) : info.base;
-    void fetch(`${base}${OPEN_IN_EDITOR_PATH}?file=${encodeURIComponent(location)}`).catch(
-      () => {},
-    );
+  if (devServerInfo()) {
+    void fetch(`${OPEN_IN_EDITOR_PATH}?file=${encodeURIComponent(location)}`).catch(() => {});
     return;
   }
 

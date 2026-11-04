@@ -92,12 +92,20 @@ export function devServerInfo(): DevServerInfo | undefined {
   return shared.info();
 }
 
+const serverErrorValues = new WeakSet<object>();
+
 /** A server error as an `Error`, so the error panel shows it like one thrown in the page. */
 export function serverErrorValue(message: ServerErrorMessage): Error {
   const error = new Error(message.message);
   error.name = message.name;
   error.stack = message.stack ?? `${message.name}: ${message.message}`;
+  serverErrorValues.add(error);
   return error;
+}
+
+/** Whether `serverErrorValue` made the value, so the page never threw it. */
+export function isServerErrorValue(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && serverErrorValues.has(value);
 }
 
 /** Where on the server the error happened, for the subtitle of its row. */

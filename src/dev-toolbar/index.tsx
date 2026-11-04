@@ -24,10 +24,15 @@ import { installElementTracking, type InspectedComponent } from './inspector/loo
 import { InspectorOverlay } from './inspector/overlay.js';
 import { addIssues, captureIssues, type IssueEntry } from './issues/tracker.js';
 import { isExtensionError } from './extension-errors.js';
-import { addError } from './error-list.js';
 import { CopyReportButton } from './report/CopyReportButton.js';
 import { pageRoute } from './report/markdown.js';
-import { createErrorRecord, createServerErrorRecord, type ErrorRecord } from './error-record.js';
+import {
+  addPageError,
+  addServerError,
+  createErrorRecord,
+  createServerErrorRecord,
+  type ErrorRecord,
+} from './error-record.js';
 import { listenToDevServer } from './dev-server.js';
 import { excludeOwner, includeOwner } from './ownership/registry.js';
 import { excludeReactiveOwner, includeReactiveOwner } from './reactivity/registry.js';
@@ -438,7 +443,7 @@ export function DevToolbar(props: DevToolbarProps) {
   function pushError(error: unknown) {
     console.error(error);
     const record = createErrorRecord(error);
-    setErrors((current) => addError(current, record));
+    setErrors((current) => addPageError(current, record));
 
     show('health');
   }
@@ -469,7 +474,7 @@ export function DevToolbar(props: DevToolbarProps) {
       },
       onServerError(message) {
         // The dev server already printed it to its terminal.
-        setErrors((current) => addError(current, createServerErrorRecord(message)));
+        setErrors((current) => addServerError(current, createServerErrorRecord(message)));
         show('health');
       },
     });

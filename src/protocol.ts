@@ -6,13 +6,11 @@
  * either side fails the other's compile instead of dropping messages.
  */
 
-/** The path every devtools endpoint of the dev server starts with, after the Vite base. */
-export const DEVTOOLS_ENDPOINT = '/__solid/devtools';
-
 /**
- * Opens a file in the editor: `GET <base>/__solid/devtools/open-in-editor?file=src/App.tsx:12:5`.
+ * Opens a file in the editor: `GET /__solid/devtools/open-in-editor?file=src/App.tsx:12:5`.
  * The dev server resolves the path against its root, so the toolbar does not
- * need to know where the root is.
+ * need to know where the root is. Like Vite's own `/__open-in-editor`, the
+ * path does not take the Vite `base`.
  */
 export const OPEN_IN_EDITOR_PATH = '/__solid/devtools/open-in-editor';
 
@@ -44,8 +42,6 @@ export interface DevServerVersions {
 }
 
 export interface DevServerInfo {
-  /** The Vite `base`, which the endpoint paths go after. */
-  base: string;
   versions: DevServerVersions;
   /** The server errors kept since the hello's `since`, oldest first. */
   errors: ServerErrorMessage[];

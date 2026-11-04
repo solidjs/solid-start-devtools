@@ -40,7 +40,7 @@ function serverError(over: Partial<ServerErrorMessage> = {}): ServerErrorMessage
 }
 
 function info(errors: ServerErrorMessage[] = []): DevServerInfo {
-  return { base: '/', versions: { 'solid-js': '2.0.0' }, errors };
+  return { versions: { 'solid-js': '2.0.0' }, errors };
 }
 
 describe('createDevServerConnection', () => {
