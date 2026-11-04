@@ -625,7 +625,8 @@ test('shows async loads, waits, fallbacks and chains', async ({ page }) => {
   );
 
   // The click held the write until both loads landed, and nothing on screen said so.
-  const wait = rows.filter({ hasText: 'wait on user, posts' }).first();
+  // solid-js rc.20 lists what the click waited on in a different order than rc.13.
+  const wait = rows.filter({ hasText: /wait on (user, posts|posts, user)/ }).first();
   await expect(wait).toContainText('no pending state shown');
   await wait.click();
   const detail = page.locator('[data-solid-async-detail]');
