@@ -227,7 +227,7 @@ test('leaves out errors thrown by browser extensions', async ({ page }) => {
 
   // An error of the app still counts.
   await page.locator('#throw-client-error').click();
-  await expect(page.getByRole('tab', { name: 'Errors', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('tab', { name: 'Health', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   );
@@ -247,7 +247,7 @@ test('keeps the newest errors when an error repeats in a loop', async ({ page })
     }
   });
 
-  const tab = page.getByRole('tab', { name: 'Errors', exact: true });
+  const tab = page.getByRole('tab', { name: 'Health', exact: true });
   await expect(tab).toHaveAttribute('aria-selected', 'true');
   await expect(tab).toContainText('200');
   // The newest is shown first, and the oldest five are gone.
