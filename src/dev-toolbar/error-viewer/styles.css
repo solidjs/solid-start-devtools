@@ -358,19 +358,19 @@
   color: var(--start-dt-red);
 }
 
-/* The `^` under the column of the hit line. */
-[data-solid-error-viewer-caret] {
-  display: block;
-  box-sizing: border-box;
-
-  color: var(--start-dt-red);
-  font-weight: 700;
-  line-height: 1.1;
-  white-space: pre;
+/* The other lines step back. The highlighter tags the block when a line is
+   in focus, so this needs no tracking of which line that is. */
+[data-solid-error-viewer-code-view] .has-focus .l:not(.focus) {
+  opacity: 0.6;
 }
 
-/* The `err` directive marks the word; the caret already points at it. */
+/* The `err` directive wraps the exact expression at the frame's column, drawn
+   as an editor's error squiggle. */
 [data-solid-error-viewer-code-view] .tok.error {
-  background: none;
-  box-shadow: none;
+  border-radius: 2px;
+  background-color: var(--start-dt-red-soft);
+  text-decoration: underline wavy var(--start-dt-red);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
 }
