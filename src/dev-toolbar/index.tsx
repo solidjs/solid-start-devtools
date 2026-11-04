@@ -515,6 +515,14 @@ export function DevToolbar(props: DevToolbarProps) {
     });
   }
 
+  // The pull tab reads out the counts it shows.
+  function handleLabel(): string {
+    const counts: string[] = [];
+    if (errors().length) counts.push(`${errors().length} errors`);
+    if (issueCount()) counts.push(`${issueCount()} issues`);
+    return ['Open Start Devtools', ...counts].join(', ');
+  }
+
   const badge = (value: Tab): number => (value === 'fn' ? callCount() : 0);
 
   return (
@@ -528,11 +536,7 @@ export function DevToolbar(props: DevToolbarProps) {
             type="button"
             data-solid-dev-toolbar-handle
             data-errors={errors().length ? '' : undefined}
-            aria-label={
-              errors().length
-                ? `Open Start Devtools, ${errors().length} errors`
-                : 'Open Start Devtools'
-            }
+            aria-label={handleLabel()}
             title="Start Devtools (Alt+Shift+D)"
             hidden={open()}
             onPointerDown={(event) => onDragHeight(event, true)}
