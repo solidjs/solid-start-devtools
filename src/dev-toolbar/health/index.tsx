@@ -1,6 +1,6 @@
 import type { JSX } from '@solidjs/web';
 import { clientOnly } from '@solidjs/web';
-import { createEffect, createMemo, createSignal, For, onSettled, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, Show } from 'solid-js';
 import { ResizeHandle } from '../../ui/ResizeHandle.js';
 import { useResizableDetail } from '../../ui/use-resizable-detail.js';
 import type { ErrorRecord } from '../error-record.js';
@@ -64,19 +64,25 @@ export default function HealthViewer(props: HealthViewerProps): JSX.Element {
     }),
   );
 
-  // The ages in the rows move on without a change to the lists, so a clock runs.
-  onSettled(() => {
-    const timer = setInterval(() => setTick((value) => value + 1), TICK_MS);
-    return () => clearInterval(timer);
-  });
-
-  // A new error lands at the top of the list and is opened, as the old Errors panel did.
-  let seenErrors = 0;
+  // The ages in the rows move on without a change to the lists, so a clock
+  // runs while the view is shown.
   createEffect(
-    () => props.errors.length,
-    (count) => {
-      if (count > seenErrors) setSelected({ kind: 'error', index: 0 });
-      seenErrors = count;
+    () => props.show,
+    (show) => {
+      if (!show) return;
+      const timer = setInterval(() => setTick((value) => value + 1), TICK_MS);
+      return () => clearInterval(timer);
+    },
+  );
+
+  // A new error lands at the top of the list and is opened, as the old Errors
+  // panel did. The newest record is compared, so a capped list still works.
+  let newest: ErrorRecord | undefined;
+  createEffect(
+    () => props.errors[0],
+    (first) => {
+      if (first && first !== newest) setSelected({ kind: 'error', index: 0 });
+      newest = first;
     },
   );
 
