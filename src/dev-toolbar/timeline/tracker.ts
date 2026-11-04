@@ -84,8 +84,24 @@ export function rootChanges(causes: ChangeRecord[], out = new Map<number, Change
   return out;
 }
 
-/** The names the runtime gives a signal or a memo created without a `name` option. */
-const DEFAULT_NAMES = new Set(['signal', 'computed', 'memo']);
+/**
+ * The names the runtime gives a signal or a memo created without a `name`
+ * option, and the names it gives the memos inside its own components, such
+ * as the `value` of a `<Show>`.
+ */
+const DEFAULT_NAMES = new Set([
+  'signal',
+  'computed',
+  'memo',
+  'value',
+  'condition',
+  'condition value',
+  'conditions',
+  'eval conditions',
+  'children',
+  'boundary',
+  'reveal order',
+]);
 
 /**
  * An update no action caused whose writes all went to unnamed signals, or

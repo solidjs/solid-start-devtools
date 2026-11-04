@@ -245,9 +245,15 @@ describe('isUnnamedUpdate', () => {
     builder.flush(flush());
     builder.rerun(rerun({ run: 3, interaction: undefined, causes: [named] }), undefined);
     builder.flush(flush());
-    builder.rerun(rerun({ run: 4, causes: [{ ...unnamed, seq: 22, origin: click }] }), undefined);
+    // The memo a `<Show>` keeps its children in.
+    builder.rerun(
+      rerun({ run: 4, interaction: undefined, causes: [{ ...unnamed, seq: 23, name: 'value' }] }),
+      undefined,
+    );
+    builder.flush(flush());
+    builder.rerun(rerun({ run: 5, causes: [{ ...unnamed, seq: 22, origin: click }] }), undefined);
 
-    expect(builder.snapshot().map(isUnnamedUpdate)).toEqual([false, false, true, true]);
+    expect(builder.snapshot().map(isUnnamedUpdate)).toEqual([false, true, false, true, true]);
   });
 });
 
