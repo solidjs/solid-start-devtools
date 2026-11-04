@@ -23,11 +23,22 @@ async function readJavaScript(directory: string): Promise<string> {
   return sources.join('\n');
 }
 
-// Opens the dock on a tab. The dock sits below the page, which can scroll past
-// it, so the fixture stays clickable while it is open.
+// The view each panel belongs to. Health has no panels of its own.
+const VIEW_OF: Record<string, string> = {
+  Timeline: 'Activity',
+  Async: 'Activity',
+  'Server functions': 'Activity',
+  Ownership: 'Structure',
+  Reactivity: 'Structure',
+};
+
+// Opens the dock on a view, or on a panel of a view. The dock sits below the
+// page, which can scroll past it, so the fixture stays clickable while it is open.
 async function openTab(page: Page, name: string) {
   const launcher = page.getByRole('button', { name: 'Open Start Devtools' });
   if (await launcher.isVisible()) await launcher.click();
+  const view = VIEW_OF[name];
+  if (view) await page.getByRole('tab', { name: view, exact: true }).click();
   await page.getByRole('tab', { name, exact: true }).click();
 }
 
@@ -56,7 +67,7 @@ test('docks at the bottom of the page', async ({ page }) => {
   );
 
   // Dragging the top edge resizes it, and a reload keeps the height and the tab.
-  await page.getByRole('tab', { name: 'Ownership', exact: true }).click();
+  await openTab(page, 'Ownership');
   await page.mouse.move(viewport.width / 2, box.y + 1);
   await page.mouse.down();
   await page.mouse.move(viewport.width / 2, box.y - 100, { steps: 4 });
@@ -114,12 +125,16 @@ test('moves focus with the dock and leaves typing alone', async ({ page }) => {
   const dock = page.getByRole('region', { name: 'Start Devtools' });
   const handle = page.getByRole('button', { name: 'Open Start Devtools' });
 
-  // Opening focuses the selected tab, and closing focuses the handle.
+  // Opening focuses the selected view, and closing focuses the handle.
   await handle.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('tab', { name: 'Server functions', exact: true })).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Activity', exact: true })).toBeFocused();
   await page.keyboard.press('End');
-  await expect(page.getByRole('tab', { name: 'Ownership', exact: true })).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Structure', exact: true })).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Ownership', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await page.keyboard.press('Alt+Shift+KeyD');
   await expect(dock).toBeHidden();
   await expect(handle).toBeFocused();
@@ -233,8 +248,8 @@ test('captures client errors', async ({ page }) => {
   await page.goto('/');
   await page.locator('#throw-client-error').click();
 
-  // An error opens the dock on its tab.
-  await expect(page.getByRole('tab', { name: 'Errors', exact: true })).toHaveAttribute(
+  // An error opens the dock on the Health view.
+  await expect(page.getByRole('tab', { name: 'Health', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   );
@@ -562,8 +577,8 @@ test('lists runtime issues', async ({ page }) => {
 
   // Each render of the reader reports the same untracked read.
   for (let i = 0; i < 3; i++) await page.locator('#emit-warning').click();
-  await openTab(page, 'Issues');
-  await expect(page.getByRole('tab', { name: 'Issues', exact: true })).toContainText('2');
+  await openTab(page, 'Health');
+  await expect(page.getByRole('tab', { name: 'Health', exact: true })).toContainText('2');
 
   const rows = page.locator('[data-solid-issues-row]');
   await expect(rows).toHaveCount(1);
@@ -592,10 +607,10 @@ test('lists runtime issues', async ({ page }) => {
   );
 
   // Clearing empties the list and the count.
-  await openTab(page, 'Issues');
-  await page.getByRole('button', { name: 'Clear issues' }).click();
+  await openTab(page, 'Health');
+  await page.getByRole('button', { name: 'Clear errors and issues' }).click();
   await expect(rows).toHaveCount(0);
-  await expect(page.getByRole('tab', { name: 'Issues', exact: true })).not.toContainText('2');
+  await expect(page.getByRole('tab', { name: 'Health', exact: true })).not.toContainText('2');
 });
 
 test('shows what each action re-ran and why', async ({ page }) => {
@@ -714,7 +729,7 @@ test('copies a report of the whole session', async ({ page, context }) => {
   await page.locator('#increment-count').click();
   await page.locator('#emit-warning').click();
 
-  await openTab(page, 'Errors');
+  await openTab(page, 'Health');
   await page.getByRole('button', { name: 'Copy the whole session for an agent' }).click();
   await expect.poll(clipboard).toContain('# Solid devtools session');
   const report = await clipboard();
@@ -891,29 +906,24 @@ test('inspects elements and funnels components across panels', async ({ page }) 
   await expect(overlay).toBeHidden();
   await expect(inspectButton).not.toHaveAttribute('data-active', '');
 
-  // 4. Verify the funnel badge appears in the header.
-  const funnel = page.locator('[data-solid-dev-toolbar-funnel]');
-  await expect(funnel).toBeVisible();
-  const funnelName = page.locator('[data-solid-dev-toolbar-funnel-name]');
-  await expect(funnelName).toHaveText('<Counter>');
-
-  // 5. Clicking the component name in the funnel jumps to the Ownership tree.
-  await funnelName.click();
-  await expect(page.getByRole('tab', { name: 'Ownership' })).toHaveAttribute(
+  // 4. The pick opens in the Ownership tree, selected.
+  await expect(page.getByRole('tab', { name: 'Ownership', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   );
   await expect(page.locator('[data-solid-ownership-row][data-selected]')).toContainText('Counter');
   await expect(page.locator('[data-solid-ownership-detail]')).toBeVisible();
 
-  // 6. Switching to Reactivity isolates nodes belonging to the selected owner instance.
-  await page.getByRole('tab', { name: 'Reactivity' }).click();
+  // 5. Reactivity isolates nodes under the picked component and says so.
+  await page.getByRole('tab', { name: 'Reactivity', exact: true }).click();
+  const filter = page.locator('[data-solid-reactivity-component-filter]');
+  await expect(filter).toContainText('Under <Counter>');
   const graphNodes = page.locator('[data-solid-reactivity-node-name]');
   await expect(graphNodes.filter({ hasText: 'count' })).toBeVisible();
 
-  // 7. Clear the funnel.
-  await page.getByRole('button', { name: 'Clear component funnel' }).click();
-  await expect(funnel).toHaveCount(0);
+  // 6. Clearing the filter shows the whole graph again.
+  await page.getByRole('button', { name: 'Clear component filter' }).click();
+  await expect(filter).toHaveCount(0);
 
   // 8. Test keyboard shortcut Alt+Shift+C and Escape cancel.
   await page.keyboard.press('Alt+Shift+C');

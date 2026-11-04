@@ -10,10 +10,12 @@ import {
 import { Badge } from '../../ui/Badge.js';
 import IconButton from '../../ui/IconButton.js';
 import Placeholder from '../../ui/Placeholder.js';
+import { ResizeHandle } from '../../ui/ResizeHandle.js';
 import { Section } from '../../ui/Section.js';
 import { Select, SelectOption } from '../../ui/Select.js';
 import { Tab, TabGroup, TabList, TabPanel } from '../../ui/Tabs.js';
 import { Text } from '../../ui/Text.js';
+import { useResizableDetail } from '../../ui/use-resizable-detail.js';
 import { TrashIcon } from '../icons.js';
 import { CopyReportButton } from '../report/CopyReportButton.js';
 import { readReportBody, serverFunctionReport } from '../report/function-report.js';
@@ -386,6 +388,10 @@ export interface ServerFunctionViewerProps {
 
 export function ServerFunctionViewer(props: ServerFunctionViewerProps): JSX.Element {
   const [currentInstance, setCurrentInstance] = createSignal<string>();
+  const detail = useResizableDetail({
+    storageKey: 'solid-start-devtools:functions-detail-width',
+    defaultWidth: 480,
+  });
 
   createEffect(
     () => props.focus,
@@ -430,7 +436,8 @@ export function ServerFunctionViewer(props: ServerFunctionViewerProps): JSX.Elem
             </div>
           </div>
           {/* request/response viewer */}
-          <div data-solid-functions-detail>
+          <div data-solid-functions-detail style={{ width: `${detail.width()}px` }}>
+            <ResizeHandle detail={detail} />
             <Show
               when={currentInstance()}
               fallback={

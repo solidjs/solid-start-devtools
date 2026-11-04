@@ -4,7 +4,9 @@ import type { ChangeRecord } from 'solid-js/attribution';
 import { Badge } from '../../ui/Badge.js';
 import IconButton from '../../ui/IconButton.js';
 import Placeholder from '../../ui/Placeholder.js';
+import { ResizeHandle } from '../../ui/ResizeHandle.js';
 import { Text } from '../../ui/Text.js';
+import { useResizableDetail } from '../../ui/use-resizable-detail.js';
 import { EyeIcon, TrashIcon } from '../icons.js';
 import { CopyReportButton } from '../report/CopyReportButton.js';
 import { pageRoute } from '../report/markdown.js';
@@ -16,6 +18,7 @@ import {
   type TimelineEntry,
   type TimelineRun,
 } from './tracker.js';
+import { entryDuration, entryRunCount, groupEntries, type TimelineGroup } from './group.js';
 import './styles.css';
 
 function outcomeBadge(entry: TimelineEntry): JSX.Element {
@@ -24,15 +27,6 @@ function outcomeBadge(entry: TimelineEntry): JSX.Element {
   if (outcome === 'committed') return <Badge type="success">committed</Badge>;
   if (entry.origin && !entry.interaction) return <Badge type="info">pending</Badge>;
   return <Badge type="info">{entry.origin ? (outcome ?? 'idle') : 'update'}</Badge>;
-}
-
-/** The total time of the entry: the interaction's settle time, else its flushes. */
-function duration(entry: TimelineEntry): number {
-  return entry.interaction?.settledMs ?? entry.flushMs;
-}
-
-function runCount(entry: TimelineEntry): number {
-  return entry.interaction?.runs ?? entry.runs.length + entry.droppedRuns;
 }
 
 /** `0 → 1` for a write, with the values the runtime previewed. */
@@ -179,6 +173,104 @@ function CallRow(props: {
   );
 }
 
+interface EntryRowProps {
+  entry: TimelineEntry;
+  selected: boolean;
+  nested?: boolean;
+  onSelect: (id: number) => void;
+}
+
+function EntryRow(props: EntryRowProps): JSX.Element {
+  return (
+    <button
+      type="button"
+      data-solid-timeline-row
+      data-kind={props.entry.origin ? 'interaction' : 'update'}
+      data-selected={props.selected ? '' : undefined}
+      data-nested={props.nested ? '' : undefined}
+      onClick={() => props.onSelect(props.entry.id)}
+    >
+      <span data-solid-timeline-row-head>
+        {outcomeBadge(props.entry)}
+        <Text
+          data-solid-timeline-row-label
+          options={{ size: 'xs', weight: 'semibold', font: 'mono', wrap: 'nowrap' }}
+        >
+          {props.entry.label}
+        </Text>
+      </span>
+      <Text data-solid-timeline-row-meta options={{ size: 'xs', font: 'mono' }}>
+        {[
+          plural(props.entry.writes.length, 'write'),
+          plural(entryRunCount(props.entry), 're-run'),
+          ...(props.entry.calls.length ? [plural(props.entry.calls.length, 'call')] : []),
+          ms(entryDuration(props.entry)),
+        ].join(' · ')}
+      </Text>
+    </button>
+  );
+}
+
+interface GroupRowsProps {
+  group: TimelineGroup;
+  open: boolean;
+  selected: number | undefined;
+  onToggle: () => void;
+  onSelect: (id: number) => void;
+}
+
+/** A run of entries with one label: a summary row that opens into the entries. */
+function GroupRows(props: GroupRowsProps): JSX.Element {
+  // A closed group shows the selection of an entry inside it.
+  const holdsSelection = () =>
+    !props.open && props.group.entries.some((entry) => entry.id === props.selected);
+  return (
+    <div data-solid-timeline-group data-open={props.open ? '' : undefined}>
+      <button
+        type="button"
+        data-solid-timeline-row
+        data-solid-timeline-group-head
+        data-selected={holdsSelection() ? '' : undefined}
+        aria-expanded={props.open ? 'true' : 'false'}
+        onClick={props.onToggle}
+      >
+        <span data-solid-timeline-row-head>
+          <span data-solid-timeline-chevron aria-hidden="true">
+            {props.open ? '▾' : '▸'}
+          </span>
+          <Text
+            data-solid-timeline-row-label
+            options={{ size: 'xs', weight: 'semibold', font: 'mono', wrap: 'nowrap' }}
+          >
+            {props.group.label}
+          </Text>
+          <Badge type="info">{`×${props.group.entries.length}`}</Badge>
+        </span>
+        <Text data-solid-timeline-row-meta options={{ size: 'xs', font: 'mono' }}>
+          {[
+            plural(props.group.writes, 'write'),
+            plural(props.group.runs, 're-run'),
+            ...(props.group.calls ? [plural(props.group.calls, 'call')] : []),
+            `${ms(props.group.totalMs)} total`,
+          ].join(' · ')}
+        </Text>
+      </button>
+      <Show when={props.open}>
+        <For each={props.group.entries}>
+          {(entry) => (
+            <EntryRow
+              entry={entry}
+              nested
+              selected={props.selected === entry.id}
+              onSelect={props.onSelect}
+            />
+          )}
+        </For>
+      </Show>
+    </div>
+  );
+}
+
 export interface TimelineViewerProps {
   show?: boolean;
   entries: TimelineEntry[];
@@ -194,6 +286,8 @@ export default function TimelineViewer(props: TimelineViewerProps): JSX.Element 
   const [showUnnamed, setShowUnnamed] = createSignal(false);
   const [selected, setSelected] = createSignal<number>();
   const [openRuns, setOpenRuns] = createSignal<number[]>([]);
+  const [openGroups, setOpenGroups] = createSignal<number[]>([]);
+  const detail = useResizableDetail({ storageKey: 'solid-start-devtools:timeline-detail-width' });
 
   const unnamedCount = createMemo(() => props.entries.filter(isUnnamedUpdate).length);
 
@@ -211,6 +305,9 @@ export default function TimelineViewer(props: TimelineViewerProps): JSX.Element 
     );
   });
 
+  // Folding runs after filtering, so the search only sees the entries it matches.
+  const groups = createMemo(() => groupEntries(shown()));
+
   const selectedEntry = createMemo(() => {
     const id = selected();
     return id === undefined ? undefined : props.entries.find((entry) => entry.id === id);
@@ -219,6 +316,12 @@ export default function TimelineViewer(props: TimelineViewerProps): JSX.Element 
   function select(id: number): void {
     setOpenRuns([]);
     setSelected((current) => (current === id ? undefined : id));
+  }
+
+  function toggleGroup(key: number): void {
+    setOpenGroups((current) =>
+      current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
+    );
   }
 
   function toggleRun(run: number): void {
@@ -292,38 +395,26 @@ export default function TimelineViewer(props: TimelineViewerProps): JSX.Element 
                     </Placeholder>
                   }
                 >
-                  <For each={shown()}>
-                    {(entry) => (
-                      <button
-                        type="button"
-                        data-solid-timeline-row
-                        data-kind={entry.origin ? 'interaction' : 'update'}
-                        data-selected={selected() === entry.id ? '' : undefined}
-                        onClick={() => select(entry.id)}
+                  <For each={groups()}>
+                    {(group) => (
+                      <Show
+                        when={group.folded}
+                        fallback={
+                          <EntryRow
+                            entry={group.entries[0]}
+                            selected={selected() === group.entries[0].id}
+                            onSelect={select}
+                          />
+                        }
                       >
-                        <span data-solid-timeline-row-head>
-                          {outcomeBadge(entry)}
-                          <Text
-                            data-solid-timeline-row-label
-                            options={{
-                              size: 'xs',
-                              weight: 'semibold',
-                              font: 'mono',
-                              wrap: 'nowrap',
-                            }}
-                          >
-                            {entry.label}
-                          </Text>
-                        </span>
-                        <Text data-solid-timeline-row-meta options={{ size: 'xs', font: 'mono' }}>
-                          {[
-                            plural(entry.writes.length, 'write'),
-                            plural(runCount(entry), 're-run'),
-                            ...(entry.calls.length ? [plural(entry.calls.length, 'call')] : []),
-                            ms(duration(entry)),
-                          ].join(' · ')}
-                        </Text>
-                      </button>
+                        <GroupRows
+                          group={group}
+                          open={openGroups().includes(group.key)}
+                          selected={selected()}
+                          onToggle={() => toggleGroup(group.key)}
+                          onSelect={select}
+                        />
+                      </Show>
                     )}
                   </For>
                 </Show>
@@ -331,7 +422,8 @@ export default function TimelineViewer(props: TimelineViewerProps): JSX.Element 
 
               <Show when={selectedEntry()}>
                 {(entry) => (
-                  <aside data-solid-timeline-detail>
+                  <aside data-solid-timeline-detail style={{ width: `${detail.width()}px` }}>
+                    <ResizeHandle detail={detail} />
                     <div data-solid-timeline-detail-head>
                       {outcomeBadge(entry())}
                       <Text options={{ size: 'sm', weight: 'semibold', font: 'mono' }}>

@@ -3,7 +3,9 @@ import { createEffect, createMemo, createSignal, For, getOwner, onCleanup, Show 
 import { Badge } from '../../ui/Badge.js';
 import IconButton from '../../ui/IconButton.js';
 import Placeholder from '../../ui/Placeholder.js';
+import { ResizeHandle } from '../../ui/ResizeHandle.js';
 import { Text } from '../../ui/Text.js';
+import { useResizableDetail } from '../../ui/use-resizable-detail.js';
 import { EyeIcon, TrashIcon, TreeIcon } from '../icons.js';
 import {
   excludeReactiveOwner,
@@ -51,6 +53,7 @@ export interface AsyncViewerProps {
 }
 
 export default function AsyncViewer(props: AsyncViewerProps): JSX.Element {
+  const detail = useResizableDetail({ storageKey: 'solid-start-devtools:async-detail-width' });
   // The live list reads the graph, which must not list the panel's own nodes.
   excludeReactiveOwner(getOwner());
 
@@ -292,7 +295,8 @@ export default function AsyncViewer(props: AsyncViewerProps): JSX.Element {
                       : undefined;
                   };
                   return (
-                    <aside data-solid-async-detail>
+                    <aside data-solid-async-detail style={{ width: `${detail.width()}px` }}>
+                      <ResizeHandle detail={detail} />
                       <div data-solid-async-detail-head>
                         <span data-solid-async-type={record().type}>{record().type}</span>
                         <Text options={{ size: 'sm', weight: 'semibold', font: 'mono' }}>

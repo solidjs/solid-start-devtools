@@ -580,3 +580,34 @@
 [data-solid-reactivity-owner]:hover {
   text-decoration: underline;
 }
+
+[data-solid-reactivity-component-filter] {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+
+  padding: 0.0625rem 0.25rem 0.0625rem 0.5rem;
+
+  border-radius: 9999px;
+  background: var(--start-dt-accent-soft);
+  color: var(--start-dt-accent);
+}
+
+[data-solid-reactivity-component-filter] button {
+  display: grid;
+  place-items: center;
+  width: 1.125rem;
+  height: 1.125rem;
+
+  padding: 0;
+  border: none;
+  border-radius: 9999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+[data-solid-reactivity-component-filter] button:hover {
+  background: oklch(0.68 0.13 245 / 0.25);
+}

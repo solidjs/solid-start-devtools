@@ -19,7 +19,15 @@ pnpm add @solidjs/start-devtools@next
 The toolbar is a dock at the bottom of the page. Closed, it is a small grip at the bottom
 center. Click it, drag it up, or press Alt+Shift+D to open it. Drag its top edge to change
 its height. It remembers whether it was open, its tab and its height across reloads, and an
-error opens it on the Errors tab.
+error opens it on the Health view.
+
+The panels are grouped into three views, picked in the header:
+
+- **Health**: thrown errors and the issues the runtime reports, in one list.
+- **Activity**: the Timeline, Async and Server functions panels.
+- **Structure**: the Ownership tree and the Reactivity graph.
+
+The header and the pull tab show the `solid-js` version the app runs.
 
 The Vite plugin mounts it automatically. Integrations can use the package directly:
 

@@ -153,7 +153,10 @@
 
   gap: 0.625rem;
 
-  width: 26rem;
+  position: relative;
+
+  /* Keeps the list usable when the window shrinks below a saved width. */
+  max-width: calc(100% - 240px);
   flex-shrink: 0;
   min-height: 0;
 
@@ -352,4 +355,25 @@ button[data-solid-timeline-call]:hover {
 
 [data-solid-timeline-note] {
   color: var(--start-dt-text-muted);
+}
+
+[data-solid-timeline-group] {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-solid-timeline-group] > [data-solid-timeline-row] {
+  flex-shrink: 0;
+}
+
+[data-solid-timeline-row][data-nested] {
+  padding-left: 1.75rem;
+}
+
+[data-solid-timeline-chevron] {
+  width: 0.75rem;
+  flex-shrink: 0;
+
+  color: var(--start-dt-text-muted);
+  text-align: center;
 }
