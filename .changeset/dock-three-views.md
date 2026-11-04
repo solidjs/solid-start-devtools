@@ -7,5 +7,5 @@
 - Activity merges actions, server-function calls, async loads and waits, and errors into one stream over the last 30 seconds, with a live lanes strip on a time axis, filter chips, time groups and a pause button. Repeated actions fold into one row. An action shows what it wrote, what re-ran and which effects ran, then waterfalls of its re-runs and server calls.
 - Structure shows the ownership tree or the reactivity graph. Tree rows show signal and memo counts and how recently and how often their computations update. "Hide Solid internals" folds Solid's own components away. The detail lists props, signals and memos by kind, with a signal's previous value.
 - ⌘K (Ctrl+K) opens a search across components, signals, memos, actions and server functions while the dock is open.
-- The timeline keeps distinct actions when one action repeats many times, such as an animation loop.
+- The timeline and the async history keep everything from the last 30 seconds instead of a fixed number of entries, so a loop such as an animation frame no longer pushes other actions out. A fast run of one action draws as one bar.
 - Every list and detail split is resizable.
