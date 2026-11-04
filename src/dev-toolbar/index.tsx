@@ -27,7 +27,8 @@ import { isExtensionError } from './extension-errors.js';
 import { addError } from './error-list.js';
 import { CopyReportButton } from './report/CopyReportButton.js';
 import { pageRoute } from './report/markdown.js';
-import { createErrorRecord, type ErrorRecord } from './error-record.js';
+import { createErrorRecord, createServerErrorRecord, type ErrorRecord } from './error-record.js';
+import { listenToDevServer } from './dev-server.js';
 import { excludeOwner, includeOwner } from './ownership/registry.js';
 import { excludeReactiveOwner, includeReactiveOwner } from './reactivity/registry.js';
 import { startTimeline, TimelineBuilder, type TimelineEntry } from './timeline/tracker.js';
@@ -277,7 +278,10 @@ export function DevToolbar(props: DevToolbarProps) {
     if (saved.structureMode === 'owners' || saved.structureMode === 'graph') {
       setStructureMode(saved.structureMode);
     }
-    void loadSolidVersion().then((value) => setSolidVersion(value));
+    void loadSolidVersion().then((value) => {
+      // The dev server's answer can come first, and it reads the same package.
+      if (value) setSolidVersion(value);
+    });
     if (typeof saved.height === 'number') setHeight(clampHeight(saved.height));
     if (typeof saved.highlightUpdates === 'boolean') setHighlightUpdates(saved.highlightUpdates);
     if (saved.open) setOpen(true);
@@ -457,9 +461,23 @@ export function DevToolbar(props: DevToolbarProps) {
     window.addEventListener('error', onErrorEvent);
     window.addEventListener('unhandledrejection', onRejectionEvent);
 
+    // Errors the server runtime reported, when @solidjs/vite-plugin connected the toolbar.
+    const stopDevServer = listenToDevServer({
+      onInfo(info) {
+        const fromServer = info.versions['solid-js'];
+        if (fromServer && !solidVersion()) setSolidVersion(fromServer);
+      },
+      onServerError(message) {
+        // The dev server already printed it to its terminal.
+        setErrors((current) => addError(current, createServerErrorRecord(message)));
+        show('health');
+      },
+    });
+
     return () => {
       window.removeEventListener('error', onErrorEvent);
       window.removeEventListener('unhandledrejection', onRejectionEvent);
+      stopDevServer();
     };
   });
 
