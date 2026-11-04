@@ -14,6 +14,7 @@ import {
 import {
   isIdleEntry,
   isUnnamedUpdate,
+  WINDOW_MS,
   type TimelineEntry,
   type TimelineRun,
 } from '../timeline/tracker.js';
@@ -64,8 +65,8 @@ export interface ActivityRow {
   source: ActivitySource;
 }
 
-/** How far back the view looks. */
-export const WINDOW_MS = 30_000;
+/** How far back the view looks. The stores keep the same span. */
+export { WINDOW_MS };
 
 /** The span the view shows: what ended since `since` and began by `until`. */
 export interface ViewRange {
@@ -412,7 +413,7 @@ export function collectRows(input: CollectInput): Collected {
   }
 
   // Newest first. The sort is stable, so ties keep their source order.
-  rows.sort((a, b) => b.at - a.at);
+  rows.sort((a, b) => b.end - a.end);
   return { rows, folded };
 }
 
@@ -530,7 +531,7 @@ export function bucketLabel(ageMs: number): string {
 export function bucketRows(rows: readonly ActivityRow[], now: number): RowBucket[] {
   const buckets: RowBucket[] = [];
   for (const row of rows) {
-    const label = bucketLabel(now - row.at);
+    const label = bucketLabel(now - row.end);
     const last = buckets[buckets.length - 1];
     if (last && last.label === label) last.rows.push(row);
     else buckets.push({ label, rows: [row] });
@@ -550,7 +551,12 @@ export interface LaneTick {
   big: boolean;
   /** The row the tick stands for, so a click can select it. */
   member: string;
+  /** Every entry a run bar stands for. */
+  members?: string[];
 }
+
+/** Entries of one action closer than this draw as one bar. */
+export const RUN_GAP_MS = 250;
 
 export interface Lanes {
   start: number;
@@ -573,6 +579,46 @@ function clipBar(
   return { left: ((from - lanes.start) / span) * 100, width: ((to - from) / span) * 100 };
 }
 
+/**
+ * The ticks of a folded action, whose entries are newest first. Entries less
+ * than `RUN_GAP_MS` apart join into one bar from the start of the first to the
+ * end of the last, so a loop of 60 updates a second reads as one band. A lone
+ * entry stays a tick. A plain row's one entry is a tick.
+ */
+function pushActionTicks(lanes: Lanes, entries: readonly TimelineEntry[], folded: boolean): void {
+  let run: TimelineEntry[] = [];
+
+  function closeRun(): void {
+    if (!run.length) return;
+    const first = run[0]!;
+    const last = run[run.length - 1]!;
+    const big = run.some((entry) => entryRunCount(entry) >= BIG_RUNS);
+    if (run.length === 1) {
+      const tick = clipBar(first.at, first.at, lanes);
+      if (tick) {
+        lanes.actions.push({ left: tick.left, width: 0, big, member: actionKey(first.id) });
+      }
+    } else {
+      const bar = clipBar(first.at, last.at + entryDuration(last), lanes);
+      if (bar) {
+        const members: string[] = [];
+        for (const entry of run) members.push(actionKey(entry.id));
+        lanes.actions.push({ left: bar.left, width: bar.width, big, member: members[0]!, members });
+      }
+    }
+    run = [];
+  }
+
+  // Walk oldest to newest.
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i]!;
+    const previous = run[run.length - 1];
+    if (previous && (!folded || entry.at - previous.at >= RUN_GAP_MS)) closeRun();
+    run.push(entry);
+  }
+  closeRun();
+}
+
 /** Positions the items of the three lanes along the last `WINDOW_MS` up to `now`. */
 export function layoutLanes(rows: readonly ActivityRow[], now: number): Lanes {
   const lanes: Lanes = { start: now - WINDOW_MS, end: now, actions: [], server: [], async: [] };
@@ -580,17 +626,7 @@ export function layoutLanes(rows: readonly ActivityRow[], now: number): Lanes {
   for (const row of rows) {
     const { source } = row;
     if (source.type === 'action') {
-      // Every entry of a fold is its own tick, and a tick before the start is dropped.
-      for (const entry of source.entries) {
-        const at = clipBar(entry.at, entry.at, lanes);
-        if (!at) continue;
-        lanes.actions.push({
-          left: at.left,
-          width: 0,
-          big: entryRunCount(entry) >= BIG_RUNS,
-          member: actionKey(entry.id),
-        });
-      }
+      pushActionTicks(lanes, source.entries, row.count > 1);
     } else if (row.kind === 'server' || row.kind === 'async') {
       const bar = clipBar(row.at, row.running ? now : row.end, lanes);
       if (!bar) continue;
@@ -801,10 +837,20 @@ export class ValueMemory {
   private deltas = new WeakMap<TimelineRun, ValueDelta>();
   private seen = new WeakSet<TimelineRun>();
 
+  /** Entries already read. A builder snapshot reuses the object of an entry that did not change. */
+  private done = new WeakSet<TimelineEntry>();
+
   /** Takes the entries newest first, as the builder keeps them. */
   observe(entries: readonly TimelineEntry[]): void {
-    for (let i = entries.length - 1; i >= 0; i--) {
-      for (const run of entries[i]!.runs) {
+    // Only entries that are new or changed since the last call, oldest first.
+    const fresh: TimelineEntry[] = [];
+    for (const entry of entries) {
+      if (!this.done.has(entry)) fresh.push(entry);
+    }
+    for (let i = fresh.length - 1; i >= 0; i--) {
+      const entry = fresh[i]!;
+      this.done.add(entry);
+      for (const run of entry.runs) {
         if (this.seen.has(run)) continue;
         this.seen.add(run);
         if (run.event.nodeKind !== 'memo') continue;

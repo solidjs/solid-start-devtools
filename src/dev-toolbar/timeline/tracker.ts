@@ -60,25 +60,10 @@ export interface TimelineEntry {
   calls: TimelineCall[];
 }
 
-/** Most entries the panel keeps. The oldest go first. */
-export const MAX_ENTRIES = 100;
-/** How many entries of one label are kept before its oldest go first. */
-export const MAX_SAME_LABEL = 20;
-
-/**
- * The entry to drop when the timeline is full. A loop such as an animation
- * frame repeats one label many times a second, so the oldest entry of a label
- * that has more than `MAX_SAME_LABEL` entries goes before any other action.
- * Otherwise the oldest entry goes. `entries` is newest first.
- */
-export function evictionIndex(entries: { label: string }[]): number {
-  const counts = new Map<string, number>();
-  for (const entry of entries) counts.set(entry.label, (counts.get(entry.label) ?? 0) + 1);
-  for (let index = entries.length - 1; index >= 0; index--) {
-    if (counts.get(entries[index]!.label)! > MAX_SAME_LABEL) return index;
-  }
-  return entries.length - 1;
-}
+/** How far back the timeline and the Activity view look. */
+export const WINDOW_MS = 30_000;
+/** A safety cap that only applies in a runaway, such as a loop that makes thousands of actions a second. */
+export const MAX_ENTRIES = 5000;
 
 /** Most re-runs one entry keeps. */
 export const MAX_RUNS = 300;
@@ -173,7 +158,10 @@ export class TimelineBuilder {
    */
   private idle = new WeakMap<ChangeOrigin, InteractionEvent>();
 
-  constructor(private readonly max = MAX_ENTRIES) {}
+  constructor(
+    private readonly max = MAX_ENTRIES,
+    private readonly windowMs = WINDOW_MS,
+  ) {}
 
   private create(origin: ChangeOrigin | undefined, at: number): TimelineEntry {
     const entry: TimelineEntry = {
@@ -192,13 +180,26 @@ export class TimelineBuilder {
       calls: [],
     };
     this.entries.unshift(entry);
-    while (this.entries.length > this.max) {
-      const [dropped] = this.entries.splice(evictionIndex(this.entries), 1);
-      if (dropped!.origin) this.byOrigin.delete(dropped!.origin);
+    if (origin) this.byOrigin.set(origin, entry);
+    this.prune(entry.at);
+    return entry;
+  }
+
+  /**
+   * Drops the entries that began before the window ending at `now`, and the
+   * oldest ones past the safety cap. Returns whether any went. The list is
+   * newest first, so the oldest are at the end.
+   */
+  private prune(now: number): boolean {
+    const cutoff = now - this.windowMs;
+    let keep = this.entries.length;
+    while (keep > 0 && (keep > this.max || this.entries[keep - 1]!.at < cutoff)) keep--;
+    if (keep === this.entries.length) return false;
+    for (const dropped of this.entries.splice(keep)) {
+      if (dropped.origin) this.byOrigin.delete(dropped.origin);
       if (dropped === this.external) this.external = undefined;
     }
-    if (origin) this.byOrigin.set(origin, entry);
-    return entry;
+    return true;
   }
 
   private entryFor(origin: ChangeOrigin | undefined, at: number): TimelineEntry {
@@ -295,8 +296,9 @@ export class TimelineBuilder {
    * The entries for the panel. An entry that changed since the last call is a
    * new object, so the panel redraws only what moved.
    */
-  snapshot(): TimelineEntry[] {
-    if (!this.changed.size) return this.entries;
+  snapshot(now = performance.now()): TimelineEntry[] {
+    const pruned = this.prune(now);
+    if (!this.changed.size) return pruned ? this.entries.slice() : this.entries;
     this.entries = this.entries.map((entry) => {
       if (!this.changed.has(entry)) return entry;
       const copy = {

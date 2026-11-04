@@ -80,6 +80,24 @@ describe('AsyncHistory', () => {
   });
 });
 
+describe('retention by time', () => {
+  it('keeps the records of the last 30 seconds and drops older ones', () => {
+    const history = new AsyncHistory();
+    for (const at of [1000, 20_000, 40_000])
+      history.flight(flight({ at, nodeName: `n${at}` }), undefined);
+    history.flight(flight({ at: 45_000, nodeName: 'n45000' }), undefined);
+    expect(history.records.map((record) => record.at)).toEqual([45_000, 40_000, 20_000]);
+    expect(history.prune(80_000)).toBe(true);
+    expect(history.records).toEqual([]);
+  });
+
+  it('caps a runaway at the safety limit', () => {
+    const history = new AsyncHistory(3);
+    for (let at = 1; at <= 5; at++) history.flight(flight({ at }), undefined);
+    expect(history.records.map((record) => record.at)).toEqual([5, 4, 3]);
+  });
+});
+
 describe('concernOf', () => {
   it('flags replaced loads, silent and long waits, flashes and chains', () => {
     const history = new AsyncHistory();

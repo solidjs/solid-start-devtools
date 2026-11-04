@@ -49,6 +49,8 @@ const FILTERS: { value: ActivityFilter; label: string }[] = [
 
 /** How often the group labels and the elapsed time of what loads now are redrawn. */
 const TICK_MS = 250;
+/** Longest the view waits to read the graph after it changed. */
+const GRAPH_READ_MS = 100;
 
 export interface ActivityFocus {
   /** Select the action that began with this interaction or frame. */
@@ -123,12 +125,44 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
   const [timeRange, setTimeRange] = createSignal<TimeWindow>();
   const [owner, setOwner] = createSignal<string>();
   const [live, setLive] = createSignal<LiveLoad[]>([]);
-  const [now, setNow] = createSignal(performance.now());
   const [paused, setPaused] = createSignal(false);
   // What the list showed when it was paused.
-  const [frozenSrc, setFrozenSrc] = createSignal<ActivitySources>();
-  // The clock reads this outside any tracking scope.
+  // Read by the sampler, outside any tracking scope.
+  let frozenSrc: ActivitySources | undefined;
+  // The clock reads these outside any tracking scope.
   let frozen = false;
+  let pausedAt = 0;
+  let lastSample = 0;
+  let graphChanged = true;
+  let liveSignature = '';
+  // The list and the strip redraw from a sample taken at most every `TICK_MS`,
+  // however often the stores change. A loop that updates 60 times a second
+  // would otherwise rebuild every row 60 times a second.
+  function currentSources(): ActivitySources {
+    return {
+      entries: props.entries,
+      instances: props.instances,
+      records: props.records,
+      errors: props.errors,
+      live: live(),
+    };
+  }
+  const [view, setView] = createSignal<{ sources: ActivitySources; now: number }>({
+    sources: { entries: [], instances: {}, records: [], errors: [], live: [] },
+    now: performance.now(),
+  });
+  const now = () => view().now;
+
+  function sample(taken?: ActivitySources): void {
+    lastSample = performance.now();
+    const frozenNow = frozenSrc;
+    const current = taken ?? currentSources();
+    setView({
+      sources: frozenNow ? frozenSources(frozenNow, current) : current,
+      now: frozen ? pausedAt : lastSample,
+    });
+  }
+
   const [observed, setObserved] = createSignal(0);
   const since = new Map<string, number>();
   const memory = new ValueMemory();
@@ -159,21 +193,54 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
         // Step 2: forget what stopped loading.
         for (const id of since.keys()) if (!ids.has(id)) since.delete(id);
         setLive(loads);
+        // A load that starts or lands shows at once, not at the next tick.
+        const signature = [...ids].join('|');
+        if (signature !== liveSignature) {
+          liveSignature = signature;
+          queueMicrotask(() => sample());
+        }
       }
       const stop = startReactivityTracking();
-      const unsubscribe = subscribeReactivityGraph(read);
+      // The graph is read at the tick and only if it changed, since reading all of it costs.
+      let readTimer: ReturnType<typeof setTimeout> | undefined;
+      const unsubscribe = subscribeReactivityGraph(() => {
+        graphChanged = true;
+        // Reads are spaced out, since reading the whole graph costs.
+        readTimer ??= setTimeout(() => {
+          readTimer = undefined;
+          if (!graphChanged) return;
+          graphChanged = false;
+          read();
+        }, GRAPH_READ_MS);
+      });
       const timer = setInterval(() => {
-        if (!frozen) setNow(performance.now());
+        if (graphChanged) {
+          graphChanged = false;
+          read();
+        }
+        sample();
       }, TICK_MS);
+      graphChanged = false;
       read();
+      // Outside the effect, since reading the stores here would be an untracked read.
+      queueMicrotask(() => sample());
       return () => {
         clearInterval(timer);
+        clearTimeout(readTimer);
         unsubscribe();
         stop();
       };
     },
   );
   onCleanup(() => since.clear());
+
+  // A change in the stores shows at once when the last sample is old enough, else at the next tick.
+  createEffect(
+    () => ({ show: !!props.show, sources: currentSources() }),
+    ({ show, sources }) => {
+      if (show && performance.now() - lastSample >= TICK_MS) sample(sources);
+    },
+  );
 
   // The values of the memos that re-ran are read as the runs arrive, so the next run can show what it changed from.
   createEffect(
@@ -209,7 +276,7 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
 
   // The strip and the list cover the last `WINDOW_MS`. While paused nothing newer than the pause shows.
   const range = createMemo(() => {
-    const current = viewRange(now());
+    const current = viewRange(view().now);
     return paused() ? current : { ...current, until: Number.POSITIVE_INFINITY };
   });
 
@@ -228,38 +295,21 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
     const next = !paused();
     frozen = next;
     // Pausing keeps what is shown, so the stores can evict without the view losing rows.
-    setFrozenSrc(
-      next
-        ? {
-            entries: props.entries,
-            instances: props.instances,
-            records: props.records,
-            errors: props.errors,
-            live: live(),
-          }
-        : undefined,
-    );
-    // Resuming jumps back to live.
-    if (!next) setNow(performance.now());
+    pausedAt = view().now;
+    frozenSrc = next ? view().sources : undefined;
     setPaused(next);
+    // Resuming jumps back to live.
+    sample();
   }
 
-  const collected = createMemo(() => {
-    const current: ActivitySources = {
-      entries: props.entries,
-      instances: props.instances,
-      records: props.records,
-      errors: props.errors,
-      live: live(),
-    };
-    const frozenNow = frozenSrc();
-    return collectRows({
-      ...(frozenNow ? frozenSources(frozenNow, current) : current),
+  const collected = createMemo(() =>
+    collectRows({
+      ...view().sources,
       unfold: unfold(),
       range: range(),
       pinned: selected(),
-    });
-  });
+    }),
+  );
 
   const shown = createMemo(() => {
     const rows: ActivityRow[] = [];

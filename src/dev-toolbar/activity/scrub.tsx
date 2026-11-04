@@ -28,6 +28,11 @@ export interface ScrubProps {
   onWindow: (window: TimeWindow | undefined) => void;
 }
 
+function isSelected(tick: LaneTick, selected: string | undefined): boolean {
+  if (selected === undefined) return false;
+  return tick.member === selected || !!tick.members?.includes(selected);
+}
+
 function Ticks(props: { ticks: LaneTick[]; selected: string | undefined }): JSX.Element {
   return (
     <For each={props.ticks} keyed={(tick) => tick.member}>
@@ -35,7 +40,8 @@ function Ticks(props: { ticks: LaneTick[]; selected: string | undefined }): JSX.
         <span
           data-solid-activity-tick
           data-big={tick().big ? '' : undefined}
-          data-selected={props.selected === tick().member ? '' : undefined}
+          data-selected={isSelected(tick(), props.selected) ? '' : undefined}
+          data-run={tick().members ? '' : undefined}
           style={{
             left: `${tick().left}%`,
             width: tick().width ? `${tick().width}%` : undefined,

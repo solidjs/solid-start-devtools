@@ -336,11 +336,46 @@ describe('lanes', () => {
     expect(lanes.actions).toEqual([]);
   });
 
-  it('ticks every entry of a fold', () => {
+  it('draws a close fold as one bar of all its entries', () => {
     const { rows } = collect({
       entries: [entry(2, 'tick', NOW - 100), entry(1, 'tick', NOW - 200)],
     });
-    expect(layoutLanes(rows, NOW).actions).toHaveLength(2);
+    // Two entries 100ms apart read as one bar standing for both.
+    expect(layoutLanes(rows, NOW).actions[0]!.members).toHaveLength(2);
+  });
+});
+
+describe('run bars', () => {
+  const NOW = 100_000;
+
+  it('joins entries of a folded action less than 250ms apart into one bar', () => {
+    const entries = [];
+    for (let i = 0; i < 60; i++)
+      entries.push(entry(60 - i, 'frame', NOW - 5000 + (59 - i) * 16, { flushMs: 1 }));
+    const { rows } = collect({ entries });
+    const lanes = layoutLanes(rows, NOW);
+    expect(lanes.actions).toHaveLength(1);
+    const bar = lanes.actions[0]!;
+    expect(bar.members).toHaveLength(60);
+    const span = (59 * 16 + 1) / WINDOW_MS;
+    expect(bar.width).toBeCloseTo(span * 100);
+    expect(bar.left).toBeCloseTo(((WINDOW_MS - 5000) / WINDOW_MS) * 100);
+  });
+
+  it('keeps sparse entries as ticks and splits runs at a long gap', () => {
+    const at = [NOW - 20_000, NOW - 19_900, NOW - 19_800, NOW - 10_000];
+    const entries = [];
+    for (let i = 0; i < at.length; i++)
+      entries.push(entry(at.length - i, 'tick', at[at.length - 1 - i]!));
+    const lanes = layoutLanes(collect({ entries }).rows, NOW);
+    expect(lanes.actions).toHaveLength(2);
+    expect(lanes.actions.map((tick) => tick.members?.length ?? 1).sort()).toEqual([1, 3]);
+  });
+
+  it('keeps single actions as ticks and unfolded entries apart', () => {
+    const entries = [entry(2, 'x', NOW - 100), entry(1, 'x', NOW - 150)];
+    const unfolded = layoutLanes(collect({ entries, unfold: true }).rows, NOW);
+    expect(unfolded.actions.every((tick) => tick.width === 0)).toBe(true);
   });
 });
 

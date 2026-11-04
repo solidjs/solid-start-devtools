@@ -695,3 +695,7 @@
 [data-solid-activity-chip][data-ghost] ~ [data-solid-activity-pause] {
   margin-left: 0;
 }
+
+[data-solid-activity-lane='actions'] [data-solid-activity-tick][data-run] {
+  border-radius: 3px;
+}
