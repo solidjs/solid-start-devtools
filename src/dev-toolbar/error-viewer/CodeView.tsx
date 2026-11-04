@@ -20,6 +20,23 @@ export interface CodeViewProps {
  */
 const RANGE = 25;
 
+/**
+ * Puts a `^` under the column of the hit line.
+ *
+ * The line sits after a gutter of 58px, and the code is monospace, so the
+ * caret is indented by that gutter and one character per column before it.
+ */
+function placeCaret(hit: HTMLElement, column: number | undefined): void {
+  hit.parentElement?.querySelector('[data-solid-error-viewer-caret]')?.remove();
+  if (!column || column < 1) return;
+  const caret = document.createElement('span');
+  caret.setAttribute('data-solid-error-viewer-caret', '');
+  caret.setAttribute('aria-hidden', 'true');
+  caret.style.paddingLeft = `calc(58px + ${column - 1}ch)`;
+  caret.textContent = '^';
+  hit.after(caret);
+}
+
 export function CodeView(props: CodeViewProps): JSX.Element | null {
   const [element, setElement] = createSignal<HTMLDivElement>();
 
@@ -36,11 +53,12 @@ export function CodeView(props: CodeViewProps): JSX.Element | null {
   // The frame can sit anywhere in the file, so the view opens on it. Scrolling
   // the box itself leaves the page where it is.
   createEffect(
-    () => ({ view: element(), code: html() }),
-    ({ view }) => {
+    () => ({ view: element(), code: html(), column: props.column }),
+    ({ view, column }) => {
       if (!view) return;
       const focused = view.querySelector('.focus') as HTMLElement | null;
       if (!focused) return;
+      placeCaret(focused, column);
       view.scrollTop = Math.max(focused.offsetTop - view.clientHeight / 2, 0);
     },
   );

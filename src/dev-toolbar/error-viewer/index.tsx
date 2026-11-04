@@ -3,22 +3,16 @@ import { parse as parseErrorStack, type StackFrameLite } from 'error-stack-parse
 import * as htmlToImage from 'html-to-image';
 import type { JSX } from '@solidjs/web';
 import { Errored, For, Loading, Show, createMemo, createSignal } from 'solid-js';
-import Button from '../../ui/Button.js';
-import IconButton from '../../ui/IconButton.js';
 import Placeholder from '../../ui/Placeholder.js';
 import { ResizeHandle } from '../../ui/ResizeHandle.js';
 import { Text } from '../../ui/Text.js';
 import { useResizableDetail } from '../../ui/use-resizable-detail.js';
-import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  CameraIcon,
-  DiscordIcon,
-  GithubIcon,
-  RefreshIcon,
-  ViewCompiledIcon,
-  ViewOriginalIcon,
-} from '../icons.js';
+import type { ErrorRecord } from '../error-record.js';
+import { describeError } from '../health/describe-error.js';
+import { HealthButton } from '../health/HealthButton.js';
+import { leadingPane } from '../health/leading-pane.js';
+import { formatClock, wallTime } from '../health/time.js';
+import { CameraIcon, DiscordIcon, GithubIcon, RefreshIcon } from '../icons.js';
 import { openInEditor } from '../open-in-editor.js';
 import { CopyReportButton } from '../report/CopyReportButton.js';
 import { errorReport, resolveErrorFrames } from '../report/error-report.js';
@@ -26,54 +20,28 @@ import { pageRoute } from '../report/markdown.js';
 import { CodeView } from './CodeView.js';
 import { createStackFrame, type StackFrameSource } from './create-stack-frame.js';
 import download from './download.js';
-import { editorLocation, foldLibraryFrames, pickDefaultFrame } from './frames.js';
+import {
+  editorLocation,
+  foldLabel,
+  foldLibraryFrames,
+  isLibraryFile,
+  pickDefaultFrame,
+} from './frames.js';
 import './styles.css';
 
-export function classNames(...classes: (string | boolean | undefined)[]): string {
-  return classes.filter(Boolean).join(' ');
+/** The path of a source without its query and origin, split into folder and file name. */
+function splitPath(source: string): { folder: string; file: string } {
+  let path = source.split(/[?#]/)[0]!;
+  path = path.replace(/^file:\/\//, '').replace(/^https?:\/\/[^/]+/, '');
+  const slash = path.lastIndexOf('/');
+  return { folder: path.slice(0, slash + 1), file: path.slice(slash + 1) };
 }
 
-interface ErrorInfoProps {
-  error: unknown;
-}
-
-function ErrorInfo(props: ErrorInfoProps): JSX.Element {
-  const error = createMemo(() => {
-    const e = props.error;
-
-    if (e instanceof Error) {
-      return { name: e.name, message: e.message };
-    }
-
-    if (e instanceof ErrorEvent) {
-      return { message: e.message };
-    }
-
-    return { message: (e as Error).toString() };
-  });
-
-  return (
-    <span data-solid-error-viewer-error-info>
-      <span data-solid-error-viewer-error-info-name>{error().name}</span>
-      <span data-solid-error-viewer-error-info-message>{error().message}</span>
-    </span>
-  );
-}
-
-function getFileName(source: string): string {
-  try {
-    const path = source.startsWith('/') ? new URL(source, 'file://') : new URL(source);
-    const paths = path.pathname.split('/');
-    return paths[paths.length - 1]!;
-  } catch (error) {
-    return getFileName(`/${source}`);
-  }
-}
-
-function getFilePath(source: StackFrameSource) {
+/** `file:line:column` of a frame, as the frame list shows it. */
+function getFilePath(source: StackFrameSource): string {
   const line = source.line ? `:${source.line}` : '';
   const column = source.column ? `:${source.column}` : '';
-  return `${getFileName(source.source)}${line}${column}`;
+  return `${splitPath(source.source).file}${line}${column}`;
 }
 
 function CodeFallback(): JSX.Element {
@@ -115,7 +83,7 @@ interface FrameOptionProps {
   onSelect: (frame: StackFrameLite) => void;
 }
 
-// Frame rendered from the raw (unmapped) stack info — used while the source
+// Frame rendered from the raw (unmapped) stack info, used while the source
 // is loading or when it is unreachable, so the frame never vanishes from
 // the list.
 function rawFrameFile(frame: StackFrameLite): string {
@@ -168,57 +136,101 @@ function FrameOption(props: FrameOptionProps): JSX.Element {
   );
 }
 
+function OpenIcon(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+      <path
+        d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  );
+}
+
 interface CodeBarProps {
   source?: StackFrameSource;
   isCompiled: boolean;
-  onToggleCompiled: () => void;
+  onSetCompiled: (compiled: boolean) => void;
 }
 
+/** The path of the frame, the Original and Compiled switch and the editor button. */
 function CodeBar(props: CodeBarProps): JSX.Element {
   return (
     <div data-solid-error-viewer-stack-frames-code-bar>
-      <span data-solid-error-viewer-stack-frames-code-source>{props.source?.source}</span>
+      <span data-solid-error-viewer-stack-frames-code-source title={props.source?.source}>
+        <Show when={props.source}>
+          {(source) => (
+            <>
+              {splitPath(source().source).folder}
+              <b>{splitPath(source().source).file}</b>
+              {source().line ? `:${source().line}` : ''}
+              {source().column ? `:${source().column}` : ''}
+            </>
+          )}
+        </Show>
+      </span>
+      <div data-solid-error-viewer-segment>
+        <button
+          type="button"
+          title="View Original Source"
+          aria-pressed={props.isCompiled ? 'false' : 'true'}
+          data-on={props.isCompiled ? undefined : ''}
+          onClick={() => props.onSetCompiled(false)}
+        >
+          Original
+        </button>
+        <button
+          type="button"
+          title="View Compiled Source"
+          aria-pressed={props.isCompiled ? 'true' : 'false'}
+          data-on={props.isCompiled ? '' : undefined}
+          onClick={() => props.onSetCompiled(true)}
+        >
+          Compiled
+        </button>
+      </div>
       <Show when={props.source ? editorLocation(props.source) : undefined}>
         {(location) => (
-          <Button
+          <HealthButton
+            primary
             data-solid-error-viewer-open-in-editor
             title={`Open ${location()} in editor`}
             onClick={() => openInEditor(location())}
           >
+            <OpenIcon />
             Open in editor
-          </Button>
+          </HealthButton>
         )}
       </Show>
-      <IconButton data-solid-error-viewer-button onClick={props.onToggleCompiled} type="button">
-        <Show when={props.isCompiled} fallback={<ViewOriginalIcon title="View Original Source" />}>
-          <ViewCompiledIcon title="View Compiled Source" />
-        </Show>
-      </IconButton>
     </div>
   );
 }
 
 interface StackFramesContentProps {
-  error: Error;
+  frames: StackFrameLite[];
   isCompiled: boolean;
-  onToggleCompiled: () => void;
+  onSetCompiled: (compiled: boolean) => void;
 }
 
 function StackFramesContent(props: StackFramesContentProps) {
-  // An error without a usable stack yields no frames instead of throwing.
-  const stackframes = parseErrorStack(props.error, { allowEmpty: true });
-  const segments = foldLibraryFrames(stackframes);
+  const segments = foldLibraryFrames(props.frames);
 
   const [selectedFrame, setSelectedFrame] = createSignal<StackFrameLite | undefined>(
-    pickDefaultFrame(stackframes),
+    pickDefaultFrame(props.frames),
   );
   // Ids of the folded runs that are open.
   const [expanded, setExpanded] = createSignal<ReadonlySet<number>>(new Set());
 
-  const detail = useResizableDetail({
-    storageKey: 'solid-start-devtools:error-code-width',
-    defaultWidth: 480,
-  });
+  // The handle is the left edge of the code, so it sizes the frame list before it.
+  const framesWidth = leadingPane(
+    useResizableDetail({
+      storageKey: 'solid-start-devtools:error-frames-width',
+      defaultWidth: 250,
+      minWidth: 160,
+    }),
+  );
 
   function toggleFold(id: number) {
     const next = new Set(expanded());
@@ -233,7 +245,7 @@ function StackFramesContent(props: StackFramesContentProps) {
   function codeFallback() {
     return (
       <>
-        <CodeBar isCompiled={props.isCompiled} onToggleCompiled={props.onToggleCompiled} />
+        <CodeBar isCompiled={props.isCompiled} onSetCompiled={props.onSetCompiled} />
         <CodeFallback />
       </>
     );
@@ -252,11 +264,12 @@ function StackFramesContent(props: StackFramesContentProps) {
 
   return (
     <div data-solid-error-viewer-stack-frames-content>
-      <div data-solid-error-viewer-stack-frames>
+      <div data-solid-error-viewer-stack-frames style={{ width: `${framesWidth.width()}px` }}>
         <For each={segments}>
           {(segment) => {
             if (segment.type === 'frame') return frameOption(segment.frame);
             const open = () => expanded().has(segment.id);
+            const label = foldLabel(segment.frames.map((frame) => frame.file));
             return (
               <>
                 <button
@@ -265,9 +278,7 @@ function StackFramesContent(props: StackFramesContentProps) {
                   aria-expanded={open() ? 'true' : 'false'}
                   onClick={() => toggleFold(segment.id)}
                 >
-                  {`${open() ? '▾' : '▸'} ${segment.frames.length} ${
-                    segment.frames.length === 1 ? 'frame' : 'frames'
-                  } in libraries`}
+                  {`${open() ? '▾' : '▸'} ${label}`}
                 </button>
                 <Show when={open()}>
                   <For each={segment.frames}>{(frame) => frameOption(frame)}</For>
@@ -277,8 +288,8 @@ function StackFramesContent(props: StackFramesContentProps) {
           }}
         </For>
       </div>
-      <div data-solid-error-viewer-stack-frames-code style={{ width: `${detail.width()}px` }}>
-        <ResizeHandle detail={detail} />
+      <div data-solid-error-viewer-stack-frames-code>
+        <ResizeHandle detail={framesWidth} title="Drag to resize, double-click to reset" />
         <Show when={selectedFrame()} keyed>
           {(frame) => (
             // Keyed on the frame so a failure inspecting one frame (an
@@ -295,7 +306,7 @@ function StackFramesContent(props: StackFramesContentProps) {
                           <CodeBar
                             source={source}
                             isCompiled={props.isCompiled}
-                            onToggleCompiled={props.onToggleCompiled}
+                            onSetCompiled={props.onSetCompiled}
                           />
                           <div data-solid-error-viewer-stack-frames-code-container>
                             <CodeView
@@ -319,33 +330,19 @@ function StackFramesContent(props: StackFramesContentProps) {
   );
 }
 
-interface StackFramesProps {
-  error: unknown;
-  isCompiled: boolean;
-  onToggleCompiled: () => void;
-}
-
-function StackFrames(props: StackFramesProps) {
-  return (
-    <Show when={props.error instanceof Error && props.error} keyed>
-      {(current) => (
-        <StackFramesContent
-          error={current}
-          isCompiled={props.isCompiled}
-          onToggleCompiled={props.onToggleCompiled}
-        />
-      )}
-    </Show>
-  );
-}
-
 interface ErrorViewerProps {
   show?: boolean;
   errors: any[];
+  /** When and during what each error was caught, in the order of `errors`. */
+  records?: ErrorRecord[];
   resetError: () => void;
   /** 0-based index into `errors`. When set, the parent owns the selection. */
   index?: number;
   onIndexChange?: (index: number) => void;
+  /** The label of the action an origin belongs to, when it belongs to one. */
+  describeOrigin?: (origin: object) => string | undefined;
+  /** Opens the action an origin belongs to in the Activity view. */
+  onShowInActivity?: (origin: object) => void;
 }
 
 const ISSUE_THREAD = 'https://github.com/solidjs/solid-start-devtools/issues/new';
@@ -373,10 +370,6 @@ export default function ErrorViewer(props: ErrorViewerProps): JSX.Element {
 
   function goNext() {
     selectIndex(current() < length() - 1 ? current() + 1 : 0);
-  }
-
-  function toggleIsCompiled() {
-    setIsCompiled((c) => !c);
   }
 
   const [panel, setPanel] = createSignal<HTMLElement>();
@@ -426,57 +419,117 @@ export default function ErrorViewer(props: ErrorViewerProps): JSX.Element {
           }
         >
           <div ref={setPanel} data-solid-error-viewer>
-            <div data-solid-error-viewer-navbar>
-              <div data-solid-error-viewer-navbar-left>
-                <Show when={props.errors.length > 1}>
-                  <div data-solid-error-viewer-pagination>
-                    <IconButton data-solid-error-viewer-button onClick={goPrev} type="button">
-                      <ArrowLeftIcon title="Go Previous" />
-                    </IconButton>
-                    <div data-solid-error-viewer-page-counter>
-                      {`${current() + 1} of ${props.errors.length}`}
-                    </div>
-                    <IconButton data-solid-error-viewer-button onClick={goNext} type="button">
-                      <ArrowRightIcon title="Go Next" />
-                    </IconButton>
-                  </div>
-                </Show>
-              </div>
-              <div data-solid-error-viewer-controls>
-                <CopyReportButton label="this error" report={copyErrorReport} />
-                <IconButton data-solid-error-viewer-button onClick={redirectToGithub} type="button">
-                  <GithubIcon title="Create an issue thread on Github" />
-                </IconButton>
-                <IconButton
-                  data-solid-error-viewer-button
-                  onClick={redirectToDiscord}
-                  type="button"
-                >
-                  <DiscordIcon title="Join our Discord Channel" />
-                </IconButton>
-                <IconButton
-                  data-solid-error-viewer-button
-                  onClick={downloadScreenshot}
-                  type="button"
-                >
-                  <CameraIcon title="Capture Error Overlay" />
-                </IconButton>
-                <IconButton data-solid-error-viewer-button onClick={props.resetError} type="button">
-                  <RefreshIcon title="Reset Error" />
-                </IconButton>
-              </div>
-            </div>
             <Show when={props.errors[current()]} keyed>
-              {(error) => (
-                <div data-solid-error-viewer-content>
-                  <ErrorInfo error={error} />
-                  <StackFrames
-                    error={error}
-                    isCompiled={isCompiled()}
-                    onToggleCompiled={toggleIsCompiled}
-                  />
-                </div>
-              )}
+              {(error) => {
+                // An error without a usable stack yields no frames instead of throwing.
+                const frames =
+                  error instanceof Error ? parseErrorStack(error, { allowEmpty: true }) : [];
+                const info = describeError(error);
+                const record = () => props.records?.[current()];
+                // The first frame from the app, which is where the error was thrown from.
+                const thrownIn = () => {
+                  const frame = pickDefaultFrame(frames);
+                  return frame && !isLibraryFile(frame.file) ? frame.function : undefined;
+                };
+                // The action that was running, when the origin belongs to one.
+                const action = () => {
+                  const origin = record()?.origin;
+                  const label = origin && props.describeOrigin?.(origin);
+                  return label ? { origin: origin as object, label } : undefined;
+                };
+                return (
+                  <>
+                    <div data-solid-error-viewer-head>
+                      <div data-solid-error-viewer-top>
+                        <Show when={props.errors.length > 1}>
+                          <div data-solid-error-viewer-pagination>
+                            <button type="button" title="Previous error" onClick={goPrev}>
+                              ‹
+                            </button>
+                            <span data-solid-error-viewer-page-counter>
+                              {`${current() + 1} of ${props.errors.length}`}
+                            </span>
+                            <button type="button" title="Next error" onClick={goNext}>
+                              ›
+                            </button>
+                          </div>
+                        </Show>
+                        <Show when={thrownIn()}>
+                          {(name) => (
+                            <span data-solid-error-viewer-where>
+                              in <b>{`ƒ ${name()}`}</b>
+                            </span>
+                          )}
+                        </Show>
+                        <span data-solid-error-viewer-spacer />
+                        <HealthButton icon onClick={redirectToGithub}>
+                          <GithubIcon title="Create an issue thread on GitHub" />
+                        </HealthButton>
+                        <HealthButton icon onClick={redirectToDiscord}>
+                          <DiscordIcon title="Join our Discord channel" />
+                        </HealthButton>
+                        <HealthButton icon onClick={downloadScreenshot}>
+                          <CameraIcon title="Capture the error as an image" />
+                        </HealthButton>
+                        <CopyReportButton
+                          label="this error"
+                          text="Copy report"
+                          report={copyErrorReport}
+                        />
+                        <HealthButton title="Reset the error" onClick={props.resetError}>
+                          <RefreshIcon title="" aria-hidden="true" />
+                          Reset
+                        </HealthButton>
+                      </div>
+                      <div data-solid-error-viewer-error-info-name>{info.name}</div>
+                      <div data-solid-error-viewer-error-info-message>{info.message}</div>
+                      <Show when={record()}>
+                        {(item) => (
+                          <div data-solid-error-viewer-meta>
+                            {formatClock(wallTime(item().at))}
+                            <Show when={action()}>
+                              {(found) => (
+                                <>
+                                  {' · after '}
+                                  <span data-solid-error-viewer-mono>{found().label}</span>
+                                  {' on '}
+                                  <span data-solid-error-viewer-mono>{pageRoute()}</span>
+                                  <Show when={props.onShowInActivity}>
+                                    {(show) => (
+                                      <>
+                                        {' · '}
+                                        <button
+                                          type="button"
+                                          data-solid-error-viewer-link
+                                          onClick={() => show()(found().origin)}
+                                        >
+                                          see it in Activity
+                                        </button>
+                                      </>
+                                    )}
+                                  </Show>
+                                </>
+                              )}
+                            </Show>
+                          </div>
+                        )}
+                      </Show>
+                    </div>
+                    <Show
+                      when={frames.length}
+                      fallback={
+                        <div data-solid-error-viewer-nostack>This value has no stack to show.</div>
+                      }
+                    >
+                      <StackFramesContent
+                        frames={frames}
+                        isCompiled={isCompiled()}
+                        onSetCompiled={setIsCompiled}
+                      />
+                    </Show>
+                  </>
+                );
+              }}
             </Show>
           </div>
         </Show>

@@ -23,23 +23,35 @@ async function readJavaScript(directory: string): Promise<string> {
   return sources.join('\n');
 }
 
-// The view each panel belongs to. Health has no panels of its own.
+// The view each panel belongs to. Activity is one merged stream, so Timeline, Async
+// and Server functions are not tabs of their own. Ownership and Reactivity are
+// chips inside Structure.
 const VIEW_OF: Record<string, string> = {
+  Health: 'Health',
   Timeline: 'Activity',
   Async: 'Activity',
   'Server functions': 'Activity',
   Ownership: 'Structure',
   Reactivity: 'Structure',
 };
+const CHIP_OF = new Set(['Ownership', 'Reactivity']);
 
-// Opens the dock on a view, or on a panel of a view. The dock sits below the
+// Opens the dock on a view, or on a chip of the Structure view. The dock sits below the
 // page, which can scroll past it, so the fixture stays clickable while it is open.
 async function openTab(page: Page, name: string) {
   const launcher = page.getByRole('button', { name: 'Open Start Devtools' });
   if (await launcher.isVisible()) await launcher.click();
   const view = VIEW_OF[name];
-  if (view) await page.getByRole('tab', { name: view, exact: true }).click();
-  await page.getByRole('tab', { name, exact: true }).click();
+  await page.getByRole('tab', { name: view, exact: true }).click();
+  if (CHIP_OF.has(name)) await page.getByRole('tab', { name, exact: true }).click();
+}
+
+// A signal of the selected owner is a term and the definition beside it.
+function ownershipSignal(page: Page, name: string) {
+  const term = page
+    .locator('dt[data-solid-ownership-signal]')
+    .filter({ hasText: new RegExp(`${name}$`) });
+  return { term, value: term.locator('xpath=following-sibling::dd[1]') };
 }
 
 test('renders the toolbar around the app', async ({ page }) => {
@@ -77,7 +89,7 @@ test('docks at the bottom of the page', async ({ page }) => {
   await page.reload();
   await expect(dock).toBeVisible();
   await expect.poll(async () => (await dock.boundingBox())!.height).toBe(box.height + 100);
-  await expect(page.getByRole('tab', { name: 'Ownership', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('tab', { name: 'Structure', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   );
@@ -296,12 +308,11 @@ test('shows server-function calls', async ({ page }) => {
   });
 
   await page.goto('/');
-  const instances = page.locator('[data-solid-functions-instances]');
+  const instances = page.locator('[data-solid-activity-row][data-kind="server"]');
 
   await page.locator('#emit-server-function-request').click();
   await openTab(page, 'Server functions');
   await expect(instances).toContainText('loadUser');
-  await expect(page.getByRole('tab', { name: 'Server functions' })).toContainText('1');
 
   await page.locator('#emit-server-function-response').click();
   await expect(instances).toContainText('201');
@@ -310,10 +321,12 @@ test('shows server-function calls', async ({ page }) => {
   await expect(instances).toContainText('500');
 
   // The detail pane starts empty and fills in once a call is selected.
-  const detail = page.locator('[data-solid-functions-detail]');
-  await expect(detail).toContainText('Select a server function call.');
-  await page.locator('[data-solid-functions-instances] [data-solid-select-option]').first().click();
-  await expect(detail.locator('[data-solid-function-instance-viewer]')).toBeVisible();
+  const detail = page.locator('[data-solid-activity-detail]');
+  await expect(detail).toContainText('Select an item to see what it did.');
+  await instances.first().click();
+  await expect(
+    detail.locator('[data-solid-activity-detail-body][data-kind="server"]'),
+  ).toBeVisible();
 
   expect(warnings).not.toContainEqual(expect.stringContaining('STRICT_READ_UNTRACKED'));
 });
@@ -326,12 +339,10 @@ test('shows the arguments and files of an upload call', async ({ page }) => {
   await page.locator('#emit-upload-request').click();
   await openTab(page, 'Server functions');
   await page
-    .locator('[data-solid-functions-instances] [data-solid-select-option]', {
-      hasText: 'uploadAvatar',
-    })
+    .locator('[data-solid-activity-row][data-kind="server"]', { hasText: 'uploadAvatar' })
     .click();
 
-  const detail = page.locator('[data-solid-functions-detail]');
+  const detail = page.locator('[data-solid-activity-detail]');
   await expect(detail.locator('[data-solid-seroval-viewer]')).toContainText('note');
   await expect(detail.locator('[data-solid-form-data-viewer]')).toContainText('file0');
   await expect(detail.locator('[data-solid-blob-viewer-name]')).toContainText('avatar.txt');
@@ -420,9 +431,7 @@ test('maps the reactivity graph', async ({ page }) => {
     page.locator('[data-solid-reactivity-detail] [data-solid-reactivity-owner]'),
   ).toHaveText('<App> › <Counter>');
   await page.locator('[data-solid-reactivity-detail] [data-solid-reactivity-owner]').click();
-  await expect(page.locator('[data-solid-ownership-row][data-selected]')).toContainText(
-    '<Counter>',
-  );
+  await expect(page.locator('[data-solid-ownership-row][data-selected]')).toContainText('Counter');
 });
 
 test('maps the ownership tree', async ({ page }) => {
@@ -430,40 +439,37 @@ test('maps the ownership tree', async ({ page }) => {
   const rows = page.locator('[data-solid-ownership-name]');
 
   await openTab(page, 'Ownership');
-  await expect(rows).toHaveText(['<App>', '<Greeting>', '<Counter>', '<Show>', '<Show>', '<Show>']);
+  // Solid's own components are hidden by default.
+  await expect(rows).toHaveText(['App', 'Greeting', 'Counter']);
 
-  // The expand arrow keeps its full size inside the button.
-  const arrow = await page
-    .locator('[data-solid-ownership-chevron]')
-    .first()
-    .evaluate((element) => {
-      const style = getComputedStyle(element, '::before');
-      return [style.width, style.height];
-    });
-  expect(arrow).toEqual(['5px', '5px']);
+  // The expand arrow is a glyph that keeps its width in the row.
+  await expect(page.locator('[data-solid-ownership-chevron]').first()).toHaveText('▾');
+  expect(
+    await page
+      .locator('[data-solid-ownership-chevron]')
+      .first()
+      .evaluate((element) => element.getBoundingClientRect().width),
+  ).toBe(12);
 
   // The detail pane only appears once an owner is selected.
   await expect(page.locator('[data-solid-ownership-detail]')).toHaveCount(0);
 
   // A component owns the signals and scopes created inside it.
-  await page.locator('[data-solid-ownership-label]').filter({ hasText: '<Counter>' }).click();
+  await page.locator('[data-solid-ownership-label]').filter({ hasText: 'Counter' }).click();
   const detail = page.locator('[data-solid-ownership-detail]');
-  await expect(detail).toContainText('Signals (1)');
+  await expect(detail.locator('[data-solid-ownership-detail-head]')).toContainText('<Counter');
+  await expect(detail).toContainText('count');
   await expect(detail).toContainText('count');
   await expect(detail).toContainText('doubled');
 
   // Values stay live while the panel is open, even when the tree does not move.
   // The panel covers the page, so the click goes straight to the element.
   await page.evaluate(() => (document.querySelector('#increment-count') as HTMLElement).click());
-  await expect(
-    detail
-      .locator('[data-solid-ownership-signal]')
-      .filter({ has: page.getByText('count', { exact: true }) }),
-  ).toContainText('1');
+  await expect(ownershipSignal(page, 'count').value).toContainText('1');
 
   // Props are listed by name, never read.
-  await page.locator('[data-solid-ownership-label]').filter({ hasText: '<Greeting>' }).click();
-  await expect(detail).toContainText('Props (1)');
+  await page.locator('[data-solid-ownership-label]').filter({ hasText: 'Greeting' }).click();
+  await expect(detail).toContainText('prop');
   await expect(detail).toContainText('name');
 
   // The ancestry section lists the owners above the selection, nearest first.
@@ -474,28 +480,29 @@ test('maps the ownership tree', async ({ page }) => {
 
   // Clicking a frame walks up the tree.
   await frames.nth(1).click();
-  await expect(detail.locator('[data-solid-ownership-detail-head]')).toContainText('<App>');
+  await expect(detail.locator('[data-solid-ownership-detail-head]')).toContainText('<App');
 
-  // Owner mode adds the scopes that component mode folds away.
-  await page.getByRole('button', { name: 'Owners', exact: true }).click();
+  // Showing Solid internals adds the scopes that the default view folds away.
+  const internals = page.locator('[data-solid-ownership-mode]');
+  await internals.click();
+  await expect(internals).toHaveAttribute('aria-pressed', 'false');
   await expect(rows.filter({ hasText: /^doubled$/ })).toHaveCount(1);
 
   // Search keeps the ancestors of a match so the row stays reachable.
-  await page.getByRole('button', { name: 'Components', exact: true }).click();
+  await internals.click();
+  await expect(internals).toHaveAttribute('aria-pressed', 'true');
   await page.locator('[data-solid-ownership-search]').fill('doubled');
-  await expect(rows).toHaveText(['<App>', '<Counter>']);
+  await expect(rows).toHaveText(['App', 'Counter']);
 
   // Rows carry no count badges.
   await expect(page.locator('[data-solid-ownership-row] [data-solid-badge="info"]')).toHaveCount(0);
 
   // A signal opens in the reactivity graph with that node selected.
   await page.locator('[data-solid-ownership-search]').fill('');
-  await page.locator('[data-solid-ownership-label]').filter({ hasText: '<Counter>' }).click();
-  const countEntry = detail
-    .locator('[data-solid-ownership-signal]')
-    .filter({ has: page.getByText('count', { exact: true }) });
+  await page.locator('[data-solid-ownership-label]').filter({ hasText: 'Counter' }).click();
+  const countEntry = ownershipSignal(page, 'count').value;
   await countEntry.hover();
-  await countEntry.getByRole('button', { name: 'View in graph' }).click();
+  await countEntry.getByRole('button', { name: 'View count in graph' }).click();
   await expect(
     page
       .locator('[data-solid-reactivity-node]')
@@ -529,7 +536,8 @@ test('maps the ownership tree', async ({ page }) => {
 
   // In owner mode a memo is a row of its own, and its heading links to the graph.
   await openTab(page, 'Ownership');
-  await page.getByRole('button', { name: 'Owners', exact: true }).click();
+  const showInternals = page.locator('[data-solid-ownership-mode]');
+  if ((await showInternals.getAttribute('aria-pressed')) === 'true') await showInternals.click();
   await page
     .locator('[data-solid-ownership-label]')
     .filter({ hasText: /^doubled$/ })
@@ -552,18 +560,14 @@ test('maps the ownership tree', async ({ page }) => {
 
   // Double click resets the width
   await handle.dblclick();
-  const resetWidth = (await detail.boundingBox())!.width;
-  expect(Math.abs(resetWidth - 320)).toBeLessThanOrEqual(2);
+  await expect(detail).toHaveCSS('width', '480px');
 
   // The left arrow key widens the pane from the keyboard.
   await handle.focus();
   await page.keyboard.press('ArrowLeft');
-  await expect(handle).toHaveAttribute('aria-valuenow', '336');
+  await expect(handle).toHaveAttribute('aria-valuenow', '496');
 
-  await detail
-    .locator('[data-solid-ownership-detail-head]')
-    .getByRole('button', { name: 'View in graph' })
-    .click();
+  await detail.getByRole('button', { name: 'View in graph', exact: true }).click();
   await expect(
     page
       .locator('[data-solid-reactivity-node]')
@@ -584,18 +588,19 @@ test('lists runtime issues', async ({ page }) => {
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('STRICT_READ_UNTRACKED');
   await expect(rows.first()).toContainText('×2');
-  // The toolbar's own owners are not part of the path.
-  await expect(rows.first()).toContainText('<App> › <Show> › value › <DraftReader>');
-  await expect(rows.first()).not.toContainText('<DevToolbar>');
 
   // The severity filter hides it.
-  await page.locator('[data-solid-issues-filter="warn"]').click();
+  await page.locator('[data-solid-health-filter="error"]').click();
   await expect(rows).toHaveCount(0);
-  await page.locator('[data-solid-issues-filter="warn"]').click();
+  await expect(page.locator('[data-solid-health-count]')).toContainText('0');
+  await page.locator('[data-solid-health-filter="all"]').click();
 
   // The detail links to the component in the ownership tree.
   await rows.first().click();
   const detail = page.locator('[data-solid-issues-detail]');
+  // The toolbar's own owners are not part of the path.
+  await expect(detail).toContainText('<App> › <Show> › value › <DraftReader>');
+  await expect(detail).not.toContainText('<DevToolbar>');
   await expect(detail).toContainText('draft');
   await expect(detail.getByRole('link', { name: 'Open the repair guide' })).toHaveAttribute(
     'href',
@@ -603,7 +608,7 @@ test('lists runtime issues', async ({ page }) => {
   );
   await detail.getByRole('button', { name: 'Show in the ownership tree' }).click();
   await expect(page.locator('[data-solid-ownership-row][data-selected]')).toContainText(
-    '<DraftReader>',
+    'DraftReader',
   );
 
   // Clearing empties the list and the count.
@@ -618,44 +623,44 @@ test('shows what each action re-ran and why', async ({ page }) => {
   await page.locator('#increment-count').click();
 
   await openTab(page, 'Timeline');
-  const rows = page.locator('[data-solid-timeline-row]');
-  // Clicks on the toolbar change nothing in the app, so the click on the counter is the only entry.
+  const actions = page.locator('[data-solid-activity-row][data-kind="action"]');
+  const rows = actions.filter({ hasText: 'button#increment-count' });
   await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('click on button#increment-count');
+  await expect(rows.first().locator('[data-solid-activity-what] b')).toContainText(
+    'click on button#increment-count',
+  );
   await expect(rows.first()).toContainText('1 write · 3 re-runs');
-  await expect(rows.first()).toContainText('committed');
 
   await rows.first().click();
-  const detail = page.locator('[data-solid-timeline-detail]');
-  await expect(detail.locator('[data-solid-timeline-write]')).toHaveText(/write\s*count\s*0 → 1/);
-  await expect(detail.locator('[data-solid-timeline-run-toggle]')).toHaveText([
-    /doubled/,
-    /effect/,
-    /report-doubled/,
-  ]);
+  const detail = page.locator('[data-solid-activity-detail]');
+  await expect(detail.locator('[data-solid-timeline-outcome]')).toContainText('committed');
+  const wrote = detail.locator('[data-solid-activity-node]').first();
+  await expect(wrote).toContainText('Wrote');
+  await expect(wrote).toContainText('count');
+  await expect(wrote).toContainText('0 → 1');
+  const runs = detail.locator('[data-solid-activity-wf]');
+  await expect(runs).toHaveCount(3);
+  await expect(runs.nth(0)).toContainText('doubled');
+  await expect(runs.nth(1)).toContainText('effect');
+  await expect(runs.nth(2)).toContainText('report-doubled');
 
   // An effect re-ran because the memo it reads changed, which the write caused.
-  await detail
-    .locator('[data-solid-timeline-run-toggle]')
-    .filter({ hasText: 'report-doubled' })
-    .click();
-  const causes = detail.locator(
-    '[data-solid-timeline-run][data-open] [data-solid-timeline-causes]',
-  );
+  await runs.filter({ hasText: 'report-doubled' }).click();
+  const causes = detail.locator('[data-solid-activity-causes]');
   await expect(causes.first()).toContainText('doubled changed');
   await expect(causes.first()).toContainText('count');
 
   // The eye opens the memo in the reactivity graph.
-  await detail
-    .locator('[data-solid-timeline-run]')
-    .filter({ hasText: /^doubled/ })
-    .getByRole('button', { name: 'View in graph' })
-    .click();
+  await detail.getByRole('button', { name: 'View in graph' }).first().click();
   await expect(page.getByRole('tab', { name: 'Reactivity', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   );
   await expect(page.locator('[data-solid-reactivity-detail]')).toContainText('doubled');
+
+  // Clicks on the toolbar change nothing in the app, so the click on the counter is the only entry.
+  await openTab(page, 'Timeline');
+  await expect(actions).toHaveCount(1);
 });
 
 test('lists the server calls of an action and opens them', async ({ page }) => {
@@ -664,37 +669,44 @@ test('lists the server calls of an action and opens them', async ({ page }) => {
   await page.locator('#call-server').click();
 
   await openTab(page, 'Timeline');
-  const row = page.locator('[data-solid-timeline-row]').filter({ hasText: 'button#call-server' });
-  await expect(row).toContainText('1 call');
+  const row = page
+    .locator('[data-solid-activity-row][data-kind="action"]')
+    .filter({ hasText: 'button#call-server' });
+  await expect(row).toContainText('1 server call');
   await row.click();
 
-  const call = page.locator('[data-solid-timeline-call]');
-  await expect(call).toContainText('loadUser');
-  await expect(call).toContainText('200');
+  const call = page.locator('[data-solid-activity-wf][data-kind="server"]');
+  await expect(call).toContainText('ƒ loadUser');
   await call.click();
 
-  await expect(page.getByRole('tab', { name: 'Server functions', exact: true })).toHaveAttribute(
+  // The call opens beside the list, in the same view.
+  await expect(page.getByRole('tab', { name: 'Activity', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   );
-  await expect(page.locator('[data-solid-function-instance-viewer]')).toContainText('loadUser');
+  const server = page.locator('[data-solid-activity-detail-body][data-kind="server"]');
+  await expect(server.locator('h2')).toContainText('loadUser');
+  await expect(server.locator('h2')).toContainText('200');
 });
 
 test('shows async loads, waits, fallbacks and chains', async ({ page }) => {
   await page.goto('/');
   await openTab(page, 'Async');
-  await expect(page.locator('[data-solid-async-now]')).toContainText('Nothing is loading.');
+  const live = page.locator('[data-solid-activity-row][data-kind="async"]', {
+    hasText: 'user loading',
+  });
+  await expect(live).toHaveCount(0);
 
   await page.locator('#show-async').click();
   await expect(page.locator('#async-posts')).toHaveText('post of user 1');
 
-  // While the next user loads, the panel lists what is loading.
+  // While the next user loads, the list shows what is loading.
   await page.locator('#next-user').click();
-  await expect(page.locator('[data-solid-async-now]')).toContainText('user');
+  await expect(live).toContainText('live');
   await expect(page.locator('#async-posts')).toHaveText('post of user 2');
-  await expect(page.locator('[data-solid-async-now]')).toContainText('Nothing is loading.');
+  await expect(live).toHaveCount(0);
 
-  const rows = page.locator('[data-solid-async-row]');
+  const rows = page.locator('[data-solid-activity-row][data-kind="async"]');
   await expect(rows.filter({ hasText: 'load user' }).first()).toBeVisible();
   await expect(rows.filter({ hasText: 'fallback at <App>' }).first()).toBeVisible();
   // posts starts only once user has landed.
@@ -707,13 +719,14 @@ test('shows async loads, waits, fallbacks and chains', async ({ page }) => {
   const wait = rows.filter({ hasText: /wait on (user, posts|posts, user)/ }).first();
   await expect(wait).toContainText('no pending state shown');
   await wait.click();
-  const detail = page.locator('[data-solid-async-detail]');
+  const detail = page.locator('[data-solid-activity-detail]');
   await expect(detail).toContainText('click on button#next-user');
   await expect(detail).toContainText('userId 1 → 2');
 
   // The filter hides a kind of record.
-  await page.locator('[data-solid-async-filter="chain"]').click();
-  await expect(rows.filter({ hasText: 'chain user → posts' })).toHaveCount(0);
+  await page.locator('[data-solid-activity-chip][data-filter="server"]').click();
+  await expect(rows).toHaveCount(0);
+  await page.locator('[data-solid-activity-chip][data-filter="all"]').click();
 
   // A load links to its node in the reactivity graph.
   await rows.filter({ hasText: 'load user' }).first().click();
@@ -747,22 +760,28 @@ test('hides updates that only touched unnamed signals', async ({ page }) => {
   await expect(page.locator('#async-posts')).toHaveText('post of user 1');
 
   await openTab(page, 'Timeline');
-  const rows = page.locator('[data-solid-timeline-row]');
-  const toggle = page.locator('[data-solid-timeline-unnamed]');
-  await expect(toggle).toContainText(/Show \d+ unnamed update/);
+  const rows = page.locator('[data-solid-activity-row][data-kind="action"]');
+  const toggle = page.locator('[data-solid-activity-chip][data-ghost]');
+  await expect(toggle).toContainText(/\d+ folded/);
   await expect(rows.filter({ hasText: /^update/ })).toHaveCount(0);
   await expect(rows.filter({ hasText: 'button#show-async' })).toHaveCount(1);
+  const folded = await rows.count();
 
   await toggle.click();
-  await expect(toggle).toContainText(/Hide \d+ unnamed update/);
-  expect(await rows.count()).toBeGreaterThan(1);
+  await expect(toggle).toContainText(/\d+ unfolded/);
+  expect(await rows.count()).toBeGreaterThan(folded);
 });
 
 test('copies reports for an agent', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const clipboard = () => page.evaluate(() => navigator.clipboard.readText());
+  // A button with a visible label carries the sentence in its title, an icon button in its name.
   const copy = (name: string) =>
-    page.getByRole('button', { name: `Copy ${name} for an agent` }).click();
+    page
+      .locator(
+        `button[title="Copy ${name} for an agent"], button[aria-label="Copy ${name} for an agent"]`,
+      )
+      .click();
 
   await page.goto('/');
 
@@ -786,14 +805,14 @@ test('copies reports for an agent', async ({ page, context }) => {
   await page.locator('#emit-server-function-request').click();
   await page.locator('#emit-server-function-response').click();
   await openTab(page, 'Server functions');
-  await page.locator('[data-solid-functions-instances] [data-solid-select-option]').first().click();
+  await page.locator('[data-solid-activity-row][data-kind="server"]').first().click();
   await copy('this call');
   await expect.poll(clipboard).toContain('# Server function call: `loadUser`');
   expect(await clipboard()).toContain('- Response: `201`');
 
   // A component, with its signals and where it sits.
   await openTab(page, 'Ownership');
-  await page.locator('[data-solid-ownership-label]').filter({ hasText: '<Counter>' }).click();
+  await page.locator('[data-solid-ownership-label]').filter({ hasText: 'Counter' }).click();
   await copy('this component');
   await expect.poll(clipboard).toContain('# Solid component: `<Counter>`');
   expect(await clipboard()).toContain('- `count` = `0`');
@@ -907,6 +926,10 @@ test('inspects elements and funnels components across panels', async ({ page }) 
   await expect(inspectButton).not.toHaveAttribute('data-active', '');
 
   // 4. The pick opens in the Ownership tree, selected.
+  await expect(page.getByRole('tab', { name: 'Structure', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(page.getByRole('tab', { name: 'Ownership', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
@@ -940,16 +963,13 @@ test('allows live editing of signal state and updates DOM', async ({ page }) => 
 
   // 1. Live edit via Ownership panel
   await openTab(page, 'Ownership');
-  await page.locator('[data-solid-ownership-label]').filter({ hasText: '<Counter>' }).click();
+  await page.locator('[data-solid-ownership-label]').filter({ hasText: 'Counter' }).click();
 
-  const countSignal = page
-    .locator('[data-solid-ownership-signal]')
-    .filter({ has: page.getByText('count', { exact: true }) });
+  const countSignal = ownershipSignal(page, 'count').value;
   await expect(countSignal).toContainText('0');
 
   // Trigger inline edit
-  await countSignal.hover();
-  await countSignal.locator('[data-solid-ownership-edit-signal]').click();
+  await countSignal.locator('[data-solid-ownership-value]').click();
   const ownershipInput = countSignal.locator('[data-solid-ownership-signal-input]');
   await expect(ownershipInput).toBeVisible();
   await ownershipInput.fill('42');

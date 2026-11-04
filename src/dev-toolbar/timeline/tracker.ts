@@ -62,6 +62,24 @@ export interface TimelineEntry {
 
 /** Most entries the panel keeps. The oldest go first. */
 export const MAX_ENTRIES = 100;
+/** How many entries of one label are kept before its oldest go first. */
+export const MAX_SAME_LABEL = 20;
+
+/**
+ * The entry to drop when the timeline is full. A loop such as an animation
+ * frame repeats one label many times a second, so the oldest entry of a label
+ * that has more than `MAX_SAME_LABEL` entries goes before any other action.
+ * Otherwise the oldest entry goes. `entries` is newest first.
+ */
+export function evictionIndex(entries: { label: string }[]): number {
+  const counts = new Map<string, number>();
+  for (const entry of entries) counts.set(entry.label, (counts.get(entry.label) ?? 0) + 1);
+  for (let index = entries.length - 1; index >= 0; index--) {
+    if (counts.get(entries[index]!.label)! > MAX_SAME_LABEL) return index;
+  }
+  return entries.length - 1;
+}
+
 /** Most re-runs one entry keeps. */
 export const MAX_RUNS = 300;
 
@@ -114,6 +132,23 @@ export function isUnnamedUpdate(entry: TimelineEntry): boolean {
   return !entry.origin && entry.writes.every((write) => DEFAULT_NAMES.has(write.name));
 }
 
+/**
+ * An entry that wrote nothing, re-ran nothing and made no call, hold or
+ * navigation. A click inside the toolbar ends up here: the runtime counts its
+ * flush, but the toolbar's own nodes send no records. Lists leave it out, as
+ * they do an interaction that changed nothing.
+ */
+export function isIdleEntry(entry: TimelineEntry): boolean {
+  return (
+    !entry.writes.length &&
+    !entry.runs.length &&
+    !entry.droppedRuns &&
+    !entry.calls.length &&
+    !entry.holds.length &&
+    !entry.navigations.length
+  );
+}
+
 function externalLabel(writes: ChangeRecord[]): string {
   const origin = writes.find((write) => write.origin)?.origin;
   const source = origin && origin.kind !== 'external' ? formatOrigin(origin) : 'update';
@@ -157,8 +192,9 @@ export class TimelineBuilder {
       calls: [],
     };
     this.entries.unshift(entry);
-    for (const dropped of this.entries.splice(this.max)) {
-      if (dropped.origin) this.byOrigin.delete(dropped.origin);
+    while (this.entries.length > this.max) {
+      const [dropped] = this.entries.splice(evictionIndex(this.entries), 1);
+      if (dropped!.origin) this.byOrigin.delete(dropped!.origin);
       if (dropped === this.external) this.external = undefined;
     }
     if (origin) this.byOrigin.set(origin, entry);
@@ -345,8 +381,9 @@ export function startTimeline(builder: TimelineBuilder, onChange: () => void): (
       changed();
     }),
   ];
-  // The console log stays off: the panel is where the re-runs are read.
-  const release = attribution.enable({ log: false, values: 'full' });
+  // The console log stays off: the panel is where the re-runs are read. Stacks
+  // are on so each write names the line of the handler that made it.
+  const release = attribution.enable({ log: false, values: 'full', stacks: true });
   return () => {
     release();
     for (const off of offs) off();

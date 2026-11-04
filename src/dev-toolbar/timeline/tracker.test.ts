@@ -8,7 +8,14 @@ import type {
 } from 'solid-js/attribution';
 import { timelineReport } from '../report/timeline-report.js';
 import type { CallEvent } from '@solidjs/web';
-import { callInteraction, isUnnamedUpdate, rootChanges, TimelineBuilder } from './tracker.js';
+import {
+  callInteraction,
+  evictionIndex,
+  isUnnamedUpdate,
+  MAX_SAME_LABEL,
+  rootChanges,
+  TimelineBuilder,
+} from './tracker.js';
 
 const click: ChangeOrigin = {
   kind: 'interaction',
@@ -299,5 +306,19 @@ describe('timelineReport', () => {
     const report = timelineReport({ entry: builder.snapshot()[0]!, route: '/' });
     expect(report).toContain('write `authToken` [redacted]');
     expect(report).not.toContain('a → b');
+  });
+});
+
+describe('evictionIndex', () => {
+  it('drops the oldest entry of a label repeated past the limit', () => {
+    const entries = [{ label: 'refund' }];
+    for (let i = 0; i < MAX_SAME_LABEL + 1; i++) entries.push({ label: 'update: tick' });
+    entries.push({ label: 'setFilter' });
+    // The oldest is `setFilter`, but the tick label is over the limit.
+    expect(evictionIndex(entries)).toBe(entries.length - 2);
+  });
+
+  it('drops the oldest entry when no label is over the limit', () => {
+    expect(evictionIndex([{ label: 'a' }, { label: 'b' }, { label: 'a' }])).toBe(2);
   });
 });

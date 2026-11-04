@@ -97,3 +97,53 @@ export function editorLocation(source: {
   const column = source.column ? `:${source.column}` : '';
   return `${path}:${source.line}${column}`;
 }
+
+/** The package a library file belongs to, when its path says. */
+function packageOf(file: string): string | undefined {
+  const path = file.split('?')[0]!.replace(/\\/g, '/');
+
+  // A pre-bundled dependency is one flat file, with `/` of a scoped name written as `_`.
+  const bundled = /\/\.vite\/deps\/([^/]+?)(?:\.[cm]?js)?$/.exec(path)?.[1];
+  if (bundled) {
+    // A chunk Vite split out and shares between dependencies ends in a hash,
+    // such as `dev-shared-C0gnZxoQ`. It names no package.
+    if (/-[A-Za-z0-9_]{8}$/.test(bundled)) return undefined;
+    const scoped = /^(@[^_]+)_([^_]+)/.exec(bundled);
+    return scoped ? `${scoped[1]}/${scoped[2]}` : bundled.split('_')[0];
+  }
+
+  // A package manager folder holds the package name after the last node_modules.
+  const modules = path.split('node_modules/');
+  if (modules.length > 1) {
+    const parts = modules[modules.length - 1]!.split('/');
+    if (parts[0]!.startsWith('@') && parts[1]) return `${parts[0]}/${parts[1]}`;
+    return parts[0] || undefined;
+  }
+
+  // The runtime and the start package, served from outside node_modules.
+  const scoped = /\/(@solidjs)\/([^/]+)/.exec(path);
+  if (scoped) return `${scoped[1]}/${scoped[2]}`;
+  if (/\/solid-js(?:\/|$)/.test(path)) return 'solid-js';
+  return undefined;
+}
+
+/** The names of the packages a run of library frames comes from, first seen first. */
+export function libraryNames(files: (string | undefined)[]): string[] {
+  const names: string[] = [];
+  for (const file of files) {
+    const name = file ? packageOf(file) : undefined;
+    if (name && !names.includes(name)) names.push(name);
+  }
+  return names;
+}
+
+/** The label of a folded run: "6 frames in solid-js and @solidjs/start". */
+export function foldLabel(files: (string | undefined)[]): string {
+  const names = libraryNames(files);
+  const count = `${files.length} ${files.length === 1 ? 'frame' : 'frames'}`;
+  if (names.length === 0) return `${count} in libraries`;
+  if (names.length === 1) return `${count} in ${names[0]}`;
+  if (names.length === 2) return `${count} in ${names[0]} and ${names[1]}`;
+  if (names.length === 3) return `${count} in ${names[0]}, ${names[1]} and ${names[2]}`;
+  return `${count} in ${names[0]}, ${names[1]} and ${names.length - 2} more`;
+}

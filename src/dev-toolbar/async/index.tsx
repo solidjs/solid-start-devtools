@@ -375,7 +375,7 @@ export default function AsyncViewer(props: AsyncViewerProps): JSX.Element {
   );
 }
 
-function Row(props: { label: string; children: JSX.Element }): JSX.Element {
+export function Row(props: { label: string; children: JSX.Element }): JSX.Element {
   return (
     <div data-solid-kv-row>
       <Text data-solid-kv-key options={{ size: 'xs', font: 'mono' }}>
@@ -389,7 +389,7 @@ function Row(props: { label: string; children: JSX.Element }): JSX.Element {
 }
 
 /** The fields a record has beyond its title and time. */
-function RecordRows(props: { record: AsyncRecord }): JSX.Element {
+export function RecordRows(props: { record: AsyncRecord }): JSX.Element {
   return (
     <>
       {(() => {

@@ -15,7 +15,7 @@ import {
 } from 'solid-js';
 import version from '../version.js';
 import IconButton from '../ui/IconButton.js';
-import { type ServerFunctionInstance, ServerFunctionViewer } from './functions/index.js';
+import type { ServerFunctionInstance } from './functions/index.js';
 import { captureServerFunctionCall } from './functions/tracker.js';
 import { HighlightUpdatesIcon, InspectIcon, MinimizeIcon, SolidIcon } from './icons.js';
 import { AsyncHistory, startAsyncCapture, type AsyncRecord } from './async/tracker.js';
@@ -27,47 +27,48 @@ import { isExtensionError } from './extension-errors.js';
 import { addError } from './error-list.js';
 import { CopyReportButton } from './report/CopyReportButton.js';
 import { pageRoute } from './report/markdown.js';
+import { createErrorRecord, type ErrorRecord } from './error-record.js';
 import { excludeOwner, includeOwner } from './ownership/registry.js';
 import { excludeReactiveOwner, includeReactiveOwner } from './reactivity/registry.js';
 import { startTimeline, TimelineBuilder, type TimelineEntry } from './timeline/tracker.js';
+import type { PaletteTarget } from './palette/search.js';
+import { SignalHistory } from './structure/signal-history.js';
 import './index.css';
 
 const HealthViewer = clientOnly(() => import('./health/index.js'), { lazy: true });
-const ReactivityViewer = clientOnly(() => import('./reactivity/index.js'), { lazy: true });
-const OwnershipViewer = clientOnly(() => import('./ownership/index.js'), { lazy: true });
-const TimelineViewer = clientOnly(() => import('./timeline/index.js'), { lazy: true });
-const AsyncViewer = clientOnly(() => import('./async/index.js'), { lazy: true });
+const ActivityViewer = clientOnly(() => import('./activity/index.js'), { lazy: true });
+const StructureViewer = clientOnly(() => import('./structure/index.js'), { lazy: true });
+const CommandPalette = clientOnly(() => import('./palette/index.js'), { lazy: true });
 
-/** A panel of the dock. Each belongs to one view. */
-type Tab = 'health' | 'tl' | 'async' | 'fn' | 'own' | 'rx';
-type View = 'health' | 'activity' | 'structure';
+/** A view of the dock. */
+type Tab = 'health' | 'activity' | 'structure';
+type StructureMode = 'owners' | 'graph';
 
-const VIEWS: { value: View; label: string; tabs: Tab[] }[] = [
-  { value: 'health', label: 'Health', tabs: ['health'] },
-  { value: 'activity', label: 'Activity', tabs: ['tl', 'async', 'fn'] },
-  { value: 'structure', label: 'Structure', tabs: ['own', 'rx'] },
+const VIEWS: { value: Tab; label: string }[] = [
+  { value: 'health', label: 'Health' },
+  { value: 'activity', label: 'Activity' },
+  { value: 'structure', label: 'Structure' },
 ];
 
-const TAB_LABELS: Record<Tab, string> = {
-  health: 'Health',
-  tl: 'Timeline',
-  async: 'Async',
-  fn: 'Server functions',
-  own: 'Ownership',
-  rx: 'Reactivity',
+/** The panels of older versions, and the view each now lives in. */
+const OLD_TABS: Record<string, Tab> = {
+  err: 'health',
+  issues: 'health',
+  tl: 'activity',
+  async: 'activity',
+  fn: 'activity',
+  own: 'structure',
+  rx: 'structure',
 };
 
-function viewOf(tab: Tab): (typeof VIEWS)[number] {
-  for (const view of VIEWS) {
-    if (view.tabs.includes(tab)) return view;
-  }
-  return VIEWS[0]!;
-}
-
-/** Reads a saved tab, mapping the Errors and Issues panels of older versions to Health. */
+/** Reads a saved tab, mapping the panels of older versions to their view. */
 function savedTab(value: unknown): Tab | undefined {
-  if (value === 'err' || value === 'issues') return 'health';
-  return typeof value === 'string' && value in TAB_LABELS ? (value as Tab) : undefined;
+  if (typeof value !== 'string') return undefined;
+  if (value in OLD_TABS) return OLD_TABS[value];
+  for (const view of VIEWS) {
+    if (view.value === value) return view.value;
+  }
+  return undefined;
 }
 
 /** The solid-js version the app runs, read from its package once the toolbar loads. */
@@ -94,8 +95,7 @@ const DRAG_THRESHOLD = 4;
 interface DockState {
   open: boolean;
   tab: Tab;
-  /** The last tab of each view, so switching views comes back to it. */
-  viewTabs?: Partial<Record<View, Tab>>;
+  structureMode?: StructureMode;
   height: number;
   highlightUpdates?: boolean;
 }
@@ -176,8 +176,9 @@ export function DevToolbar(props: DevToolbarProps) {
   if (owner) OBSERVE?.exclude(owner);
 
   const [open, setOpen] = createSignal(false);
-  const [tab, setTab] = createSignal<Tab>('fn');
-  const [viewTabs, setViewTabs] = createSignal<Partial<Record<View, Tab>>>({});
+  const [tab, setTab] = createSignal<Tab>('activity');
+  const [structureMode, setStructureMode] = createSignal<StructureMode>('owners');
+  const [paletteOpen, setPaletteOpen] = createSignal(false);
   const [solidVersion, setSolidVersion] = createSignal<string>();
   const [height, setHeight] = createSignal(DEFAULT_HEIGHT);
   const [highlightUpdates, setHighlightUpdates] = createSignal(false);
@@ -194,7 +195,7 @@ export function DevToolbar(props: DevToolbarProps) {
     setSelectedComponent(comp);
     // The pick opens in the ownership tree, which selects and shows it.
     setOwnershipFocus({ owner: comp.owner });
-    show('own');
+    showOwner(comp.owner);
   }
 
   function clearComponentFunnel() {
@@ -215,7 +216,7 @@ export function DevToolbar(props: DevToolbarProps) {
     writeDockState({
       open: open(),
       tab: tab(),
-      viewTabs: viewTabs(),
+      structureMode: structureMode(),
       height: height(),
       highlightUpdates: highlightUpdates(),
       ...next,
@@ -223,17 +224,27 @@ export function DevToolbar(props: DevToolbarProps) {
   }
 
   function show(value: Tab) {
-    const nextViewTabs = { ...viewTabs(), [viewOf(value).value]: value };
     setTab(value);
-    setViewTabs(nextViewTabs);
     setOpen(true);
-    persist({ open: true, tab: value, viewTabs: nextViewTabs });
+    persist({ open: true, tab: value });
   }
 
-  // A view opens on the tab it showed last.
-  function showView(view: View) {
-    const entry = VIEWS.find((item) => item.value === view)!;
-    show(viewTabs()[view] ?? entry.tabs[0]!);
+  function changeStructureMode(mode: StructureMode) {
+    setStructureMode(mode);
+    persist({ structureMode: mode });
+  }
+
+  // Other views link into Structure: an owner opens the tree, a node the graph.
+  function showOwner(owner: object) {
+    setOwnershipFocus({ owner });
+    changeStructureMode('owners');
+    show('structure');
+  }
+
+  function showInGraph(node: object) {
+    setGraphFocus({ node });
+    changeStructureMode('graph');
+    show('structure');
   }
 
   function close() {
@@ -252,9 +263,7 @@ export function DevToolbar(props: DevToolbarProps) {
   function openAndFocus() {
     show(tab());
     flush();
-    dock
-      ?.querySelector<HTMLElement>(`[data-solid-dev-toolbar-view="${viewOf(tab()).value}"]`)
-      ?.focus();
+    dock?.querySelector<HTMLElement>(`[data-solid-dev-toolbar-view="${tab()}"]`)?.focus();
   }
 
   // A panel is live only while the dock is open on its tab, so the graph and
@@ -265,13 +274,8 @@ export function DevToolbar(props: DevToolbarProps) {
     const saved = readDockState();
     const restored = savedTab(saved.tab);
     if (restored) setTab(restored);
-    if (saved.viewTabs && typeof saved.viewTabs === 'object') {
-      const next: Partial<Record<View, Tab>> = {};
-      for (const view of VIEWS) {
-        const value = savedTab(saved.viewTabs[view.value]);
-        if (value && view.tabs.includes(value)) next[view.value] = value;
-      }
-      setViewTabs(next);
+    if (saved.structureMode === 'owners' || saved.structureMode === 'graph') {
+      setStructureMode(saved.structureMode);
     }
     void loadSolidVersion().then((value) => setSolidVersion(value));
     if (typeof saved.height === 'number') setHeight(clampHeight(saved.height));
@@ -350,6 +354,13 @@ export function DevToolbar(props: DevToolbarProps) {
 
   onSettled(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // ⌘K or Ctrl+K opens the palette, only while the dock is open so the
+      // app keeps the shortcut otherwise.
+      if ((event.metaKey || event.ctrlKey) && event.code === 'KeyK' && open()) {
+        event.preventDefault();
+        setPaletteOpen((current) => !current);
+        return;
+      }
       // `code`, because Alt changes the character `key` reports on macOS.
       if (!event.altKey || !event.shiftKey) return;
       if (event.repeat || isEditable(event.composedPath()[0] ?? null)) return;
@@ -384,25 +395,14 @@ export function DevToolbar(props: DevToolbarProps) {
   }
 
   function onViewKeyDown(event: KeyboardEvent) {
-    const index = VIEWS.findIndex((entry) => entry === viewOf(tab()));
+    const index = VIEWS.findIndex((entry) => entry.value === tab());
     const target = nextIndex(event, index, VIEWS.length);
     if (target === undefined) return;
     event.preventDefault();
     const next = VIEWS[target]!;
-    showView(next.value);
+    show(next.value);
     const list = event.currentTarget as HTMLElement;
     list.querySelector<HTMLElement>(`[data-solid-dev-toolbar-view="${next.value}"]`)?.focus();
-  }
-
-  function onTabKeyDown(event: KeyboardEvent) {
-    const tabs = viewOf(tab()).tabs;
-    const target = nextIndex(event, tabs.indexOf(tab()), tabs.length);
-    if (target === undefined) return;
-    event.preventDefault();
-    const next = tabs[target]!;
-    show(next);
-    const list = event.currentTarget as HTMLElement;
-    list.querySelector<HTMLElement>(`[data-solid-dev-toolbar-tab="${next}"]`)?.focus();
   }
 
   // A panel can ask the graph to show a node. Each request is a new object, so
@@ -410,10 +410,22 @@ export function DevToolbar(props: DevToolbarProps) {
   const [graphFocus, setGraphFocus] = createSignal<{ node: object }>();
   // The graph can ask the ownership tree to show an owner the same way.
   const [ownershipFocus, setOwnershipFocus] = createSignal<{ owner: object }>();
-  // The timeline can ask the server-function panel to show a call.
-  const [functionsFocus, setFunctionsFocus] = createSignal<{ instance: string }>();
+  // Health, Structure and the palette can ask Activity to show an action, a call or an owner.
+  const [activityFocus, setActivityFocus] = createSignal<{
+    origin?: object;
+    instance?: string;
+    ownerName?: string;
+  }>();
 
-  const [errors, setErrors] = createSignal<unknown[]>([]);
+  function showInActivity(focus: { origin?: object; instance?: string; ownerName?: string }) {
+    setActivityFocus(focus);
+    show('activity');
+  }
+
+  // The structure view shows the last change of a signal it lists.
+  const signalHistory = new SignalHistory();
+
+  const [errors, setErrors] = createSignal<ErrorRecord[]>([]);
 
   function resetError() {
     setErrors([]);
@@ -421,7 +433,8 @@ export function DevToolbar(props: DevToolbarProps) {
 
   function pushError(error: unknown) {
     console.error(error);
-    setErrors((current) => addError(current, error));
+    const record = createErrorRecord(error);
+    setErrors((current) => addError(current, record));
 
     show('health');
   }
@@ -491,8 +504,6 @@ export function DevToolbar(props: DevToolbarProps) {
     }),
   );
 
-  const callCount = createMemo(() => Object.keys(instances()).length);
-
   async function copySession(): Promise<string> {
     // Loaded on use: mapping stacks needs the source-map reader the error panel loads lazily.
     const [{ resolveErrorFrames }, { SESSION_ERRORS, sessionReport }] = await Promise.all([
@@ -501,7 +512,7 @@ export function DevToolbar(props: DevToolbarProps) {
     ]);
     const recent = errors().slice(0, SESSION_ERRORS);
     const resolved = await Promise.all(
-      recent.map(async (error) => ({ error, frames: await resolveErrorFrames(error) })),
+      recent.map(async ({ error }) => ({ error, frames: await resolveErrorFrames(error) })),
     );
     return sessionReport({
       errors: resolved,
@@ -523,7 +534,22 @@ export function DevToolbar(props: DevToolbarProps) {
     return ['Open Start Devtools', ...counts].join(', ');
   }
 
-  const badge = (value: Tab): number => (value === 'fn' ? callCount() : 0);
+  // An action's label, for an error that was thrown during it.
+  function describeOrigin(origin: object): string | undefined {
+    for (const entry of timelineEntries()) {
+      if (entry.origin === origin) return entry.label;
+    }
+    return undefined;
+  }
+
+  function pickFromPalette(target: PaletteTarget) {
+    if (target.kind === 'component') showOwner(target.owner);
+    else if (target.kind === 'memo' || target.kind === 'signal') showInGraph(target.node);
+    else if (target.kind === 'action') {
+      if (target.origin) showInActivity({ origin: target.origin });
+      else show('activity');
+    } else if (target.kind === 'call') showInActivity({ instance: target.instance });
+  }
 
   return (
     <>
@@ -588,7 +614,7 @@ export function DevToolbar(props: DevToolbarProps) {
               >
                 <For each={VIEWS}>
                   {(entry) => {
-                    const selected = () => viewOf(tab()).value === entry.value;
+                    const selected = () => tab() === entry.value;
                     return (
                       <button
                         type="button"
@@ -599,7 +625,7 @@ export function DevToolbar(props: DevToolbarProps) {
                         aria-controls="solid-dev-toolbar-body"
                         tabindex={selected() ? 0 : -1}
                         data-solid-dev-toolbar-view={entry.value}
-                        onClick={() => showView(entry.value)}
+                        onClick={() => show(entry.value)}
                       >
                         {entry.label}
                         <Show when={entry.value === 'health' && errors().length}>
@@ -617,47 +643,20 @@ export function DevToolbar(props: DevToolbarProps) {
                   }}
                 </For>
               </div>
-              <Show when={viewOf(tab()).tabs.length > 1}>
-                <div
-                  data-solid-dev-toolbar-tabs
-                  role="tablist"
-                  aria-label={`${viewOf(tab()).label} panels`}
-                  onKeyDown={onTabKeyDown}
-                >
-                  <For each={viewOf(tab()).tabs}>
-                    {(value) => (
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-label={TAB_LABELS[value]}
-                        // The label names the tab, so the count is read as its description.
-                        aria-describedby={
-                          badge(value) ? `solid-dev-toolbar-tab-${value}-count` : undefined
-                        }
-                        id={`solid-dev-toolbar-tab-${value}`}
-                        aria-controls="solid-dev-toolbar-body"
-                        aria-selected={tab() === value ? 'true' : 'false'}
-                        tabindex={tab() === value ? 0 : -1}
-                        data-solid-dev-toolbar-tab={value}
-                        onClick={() => show(value)}
-                      >
-                        {TAB_LABELS[value]}
-                        <Show when={badge(value)}>
-                          {(count) => (
-                            <span
-                              id={`solid-dev-toolbar-tab-${value}-count`}
-                              data-solid-dev-toolbar-tab-badge
-                            >
-                              {count()}
-                            </span>
-                          )}
-                        </Show>
-                      </button>
-                    )}
-                  </For>
-                </div>
-              </Show>
               <div data-solid-dev-toolbar-spacer />
+              <button
+                type="button"
+                data-solid-dev-toolbar-search
+                aria-haspopup="dialog"
+                onClick={() => setPaletteOpen(true)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="11" cy="11" r="6" />
+                  <path d="m20 20-4.5-4.5" />
+                </svg>
+                <span>Find signal, component, call</span>
+                <kbd>⌘K</kbd>
+              </button>
               <IconButton
                 onClick={toggleInspect}
                 data-active={inspecting() ? '' : undefined}
@@ -690,11 +689,7 @@ export function DevToolbar(props: DevToolbarProps) {
               data-solid-dev-toolbar-body
               id="solid-dev-toolbar-body"
               role="tabpanel"
-              aria-labelledby={
-                viewOf(tab()).tabs.length > 1
-                  ? `solid-dev-toolbar-tab-${tab()}`
-                  : `solid-dev-toolbar-view-${viewOf(tab()).value}`
-              }
+              aria-labelledby={`solid-dev-toolbar-view-${tab()}`}
             >
               <HealthViewer
                 show={visible('health')}
@@ -702,81 +697,67 @@ export function DevToolbar(props: DevToolbarProps) {
                 resetError={resetError}
                 issues={issues()}
                 onClearIssues={() => setIssues([])}
-                onViewOwner={(owner) => {
-                  setOwnershipFocus({ owner });
-                  show('own');
-                }}
-                onViewInGraph={(node) => {
-                  setGraphFocus({ node });
-                  show('rx');
-                }}
+                onViewOwner={showOwner}
+                onViewInGraph={showInGraph}
+                describeOrigin={describeOrigin}
+                onShowInActivity={(origin: object) => showInActivity({ origin })}
               />
-              <TimelineViewer
-                show={visible('tl')}
+              <ActivityViewer
+                show={visible('activity')}
                 entries={timelineEntries()}
+                history={asyncHistory}
+                records={asyncRecords()}
+                instances={instances()}
+                errors={errors()}
+                focus={activityFocus()}
                 onClear={() => {
                   timeline.clear();
                   setTimelineEntries([]);
-                }}
-                onViewCall={(instance) => {
-                  setFunctionsFocus({ instance });
-                  show('fn');
-                }}
-                onViewInGraph={(node) => {
-                  setGraphFocus({ node });
-                  show('rx');
-                }}
-              />
-              <AsyncViewer
-                show={visible('async')}
-                history={asyncHistory}
-                records={asyncRecords()}
-                onClear={() => {
                   asyncHistory.clear();
                   setAsyncRecords([]);
                 }}
-                onViewInGraph={(node) => {
-                  setGraphFocus({ node });
-                  show('rx');
-                }}
-                onViewOwner={(owner) => {
-                  setOwnershipFocus({ owner });
-                  show('own');
-                }}
-              />
-              <ReactivityViewer
-                show={visible('rx')}
-                focus={graphFocus()}
-                ownerFilter={selectedComponent()?.owner}
-                componentFilter={selectedComponent()?.name}
-                onClearComponentFilter={clearComponentFunnel}
-                onViewOwner={(owner) => {
-                  setOwnershipFocus({ owner });
-                  show('own');
-                }}
-              />
-              <OwnershipViewer
-                show={visible('own')}
-                focus={ownershipFocus()}
-                onViewInGraph={(node) => {
-                  setGraphFocus({ node });
-                  show('rx');
-                }}
-              />
-              <ServerFunctionViewer
-                show={visible('fn')}
-                focus={functionsFocus()}
-                instances={instances()}
-                onDeleteInstance={(value) => {
+                onDeleteInstance={(value: string) => {
                   setInstances((current) => {
                     const next = { ...current };
                     delete next[value];
                     return next;
                   });
                 }}
+                onViewInGraph={showInGraph}
+                onViewOwner={showOwner}
+                onShowInStructure={showInGraph}
+                onShowError={() => show('health')}
+              />
+              <StructureViewer
+                show={visible('structure')}
+                mode={structureMode()}
+                onModeChange={changeStructureMode}
+                focus={graphFocus()}
+                ownerFocus={ownershipFocus()}
+                ownerFilter={selectedComponent()?.owner}
+                componentFilter={selectedComponent()?.name}
+                onClearComponentFilter={clearComponentFunnel}
+                onViewOwner={showOwner}
+                onViewInGraph={showInGraph}
+                lastChange={(_id: string | number, node?: object) =>
+                  node ? signalHistory.lastChange(node) : undefined
+                }
+                onShowActivity={(_owner: object, name: string) =>
+                  showInActivity({ ownerName: name })
+                }
               />
             </div>
           </div>
+          <Show when={paletteOpen()}>
+            <div data-solid-dev-toolbar-palette-layer>
+              <CommandPalette
+                entries={timelineEntries()}
+                instances={instances()}
+                onPick={pickFromPalette}
+                onClose={() => setPaletteOpen(false)}
+              />
+            </div>
+          </Show>
         </div>
         <HighlightUpdatesOverlay active={highlightUpdates()} />
         <InspectorOverlay

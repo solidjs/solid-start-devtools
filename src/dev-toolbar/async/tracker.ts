@@ -11,6 +11,20 @@ import { appOwnerPath } from '../issues/tracker.js';
 /** A fallback shown for less than this reads as a flash, as the runtime's `FALLBACK_FLASH` finding counts it. */
 export const FLASH_MS = 150;
 
+/**
+ * Whether the node sits under an owner the toolbar excluded with
+ * `OBSERVE.exclude`. The runtime still sends the records of such a node, so
+ * the history asks the runtime's own answer by owner identity.
+ */
+function isToolbarNode(node: object | undefined): boolean {
+  if (!node) return false;
+  try {
+    return !!OBSERVE?.isExcluded?.(node as never);
+  } catch {
+    return false;
+  }
+}
+
 /** Most records the panel keeps. The oldest go first. */
 export const MAX_RECORDS = 200;
 
@@ -80,6 +94,7 @@ export class AsyncHistory {
   }
 
   flight(event: FlightEvent, node: object | undefined): void {
+    if (isToolbarNode(node)) return;
     if (node) this.sources.add(node);
     this.add({
       type: 'load',
@@ -104,6 +119,7 @@ export class AsyncHistory {
   }
 
   fallback(event: FallbackEvent, node: object | undefined): void {
+    if (isToolbarNode(node)) return;
     this.add({
       type: 'fallback',
       id: this.nextId++,

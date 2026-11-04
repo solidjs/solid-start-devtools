@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { editorLocation, foldLibraryFrames, isLibraryFile, pickDefaultFrame } from './frames.js';
+import {
+  editorLocation,
+  foldLabel,
+  foldLibraryFrames,
+  isLibraryFile,
+  libraryNames,
+  pickDefaultFrame,
+} from './frames.js';
 
 describe('isLibraryFile', () => {
   it('flags node_modules, solid-js, @solidjs and the devtools', () => {
@@ -77,5 +84,36 @@ describe('editorLocation', () => {
   it('is undefined without a file or line', () => {
     expect(editorLocation({ source: '', line: 1 })).toBeUndefined();
     expect(editorLocation({ source: 'a.ts' })).toBeUndefined();
+  });
+});
+
+describe('libraryNames', () => {
+  it('leaves out the hashed chunks Vite shares between dependencies', () => {
+    expect(
+      libraryNames([
+        'http://localhost:5173/node_modules/.vite/deps/dev-shared-C0gnZxoQ.js?v=1',
+        'http://localhost:5173/node_modules/.vite/deps/solid-js.js?v=1',
+      ]),
+    ).toEqual(['solid-js']);
+  });
+
+  it('reads package names from node_modules, pre-bundled and served paths', () => {
+    expect(
+      libraryNames([
+        '/app/node_modules/.pnpm/solid-js@2.0.0/node_modules/solid-js/dist/dev.js',
+        'http://localhost:3000/node_modules/.vite/deps/@solidjs_start_server.js?v=1',
+        'http://localhost:3000/node_modules/@solidjs/start/dist/x.js',
+        undefined,
+      ]),
+    ).toEqual(['solid-js', '@solidjs/start']);
+  });
+});
+
+describe('foldLabel', () => {
+  it('names the libraries of the run', () => {
+    const files = ['/a/node_modules/solid-js/x.js', '/a/node_modules/@solidjs/start/y.js'];
+    expect(foldLabel(files)).toBe('2 frames in solid-js and @solidjs/start');
+    expect(foldLabel(['/a/node_modules/solid-js/x.js'])).toBe('1 frame in solid-js');
+    expect(foldLabel(['http://x/y.js'])).toBe('1 frame in libraries');
   });
 });

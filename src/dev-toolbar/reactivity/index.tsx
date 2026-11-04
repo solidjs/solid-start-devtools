@@ -147,6 +147,8 @@ export interface ReactivityViewerProps {
   componentFilter?: string;
   /** Drops the component filter set by the element inspector. */
   onClearComponentFilter?: () => void;
+  /** Shown first in the toolbar, such as the Structure view's mode chips. */
+  lead?: JSX.Element;
 }
 
 function isDescendantOf(owner: object | undefined, target: object): boolean {
@@ -490,6 +492,7 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
       <div data-solid-dev-toolbar-panel>
         <div data-solid-reactivity-viewer>
           <div data-solid-reactivity-nav>
+            {props.lead}
             <input
               data-solid-reactivity-search
               type="search"

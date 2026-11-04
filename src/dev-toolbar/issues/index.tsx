@@ -1,7 +1,7 @@
 import type { JSX } from '@solidjs/web';
-import { DEV, Show } from 'solid-js';
-import { Badge } from '../../ui/Badge.js';
-import { Text } from '../../ui/Text.js';
+import { DEV, For, Show } from 'solid-js';
+import { HealthButton } from '../health/HealthButton.js';
+import { Glyph, type Tone } from '../health/HealthRow.js';
 import { EyeIcon, TreeIcon } from '../icons.js';
 import { CopyReportButton } from '../report/CopyReportButton.js';
 import { pageRoute } from '../report/markdown.js';
@@ -11,15 +11,10 @@ import './styles.css';
 
 export type Severity = IssueEvent['severity'];
 
-export const SEVERITIES: { value: Severity; label: string }[] = [
-  { value: 'error', label: 'Errors' },
-  { value: 'warn', label: 'Warnings' },
-  { value: 'info', label: 'Info' },
-];
-
-export const BADGES: Record<Severity, 'failure' | 'warning' | 'info'> = {
-  error: 'failure',
-  warn: 'warning',
+/** The tone an issue is drawn in: its severity. */
+export const TONES: Record<Severity, Tone> = {
+  error: 'error',
+  warn: 'warn',
   info: 'info',
 };
 
@@ -72,39 +67,6 @@ export function matchesIssue(entry: IssueEntry, search: string): boolean {
   return false;
 }
 
-export interface IssueRowProps {
-  entry: IssueEntry;
-  selected: boolean;
-  onSelect: () => void;
-}
-
-export function IssueRow(props: IssueRowProps): JSX.Element {
-  return (
-    <button
-      type="button"
-      data-solid-issues-row
-      data-severity={props.entry.event.severity}
-      data-selected={props.selected ? '' : undefined}
-      onClick={props.onSelect}
-    >
-      <span data-solid-issues-row-head>
-        <Badge type={BADGES[props.entry.event.severity]}>{props.entry.event.code}</Badge>
-        <Show when={props.entry.count > 1}>
-          <span data-solid-issues-row-count>{`×${props.entry.count}`}</span>
-        </Show>
-        <Show when={props.entry.event.ownerPath?.length}>
-          <Text data-solid-issues-row-owner options={{ size: 'xs', font: 'mono', wrap: 'nowrap' }}>
-            {props.entry.event.ownerPath!.join(' › ')}
-          </Text>
-        </Show>
-      </span>
-      <Text data-solid-issues-row-message options={{ size: 'xs' }}>
-        {issueText(props.entry.event)}
-      </Text>
-    </button>
-  );
-}
-
 export interface IssueDetailProps {
   entry: IssueEntry;
   /** Opens the owner of a finding in the ownership tree. */
@@ -113,111 +75,96 @@ export interface IssueDetailProps {
   onViewInGraph?: (node: object) => void;
 }
 
+/** The rows of the key and value list: label, then a mono value. */
+function issueFacts(entry: IssueEntry): { key: string; value: string }[] {
+  const facts = [{ key: 'Kind', value: entry.event.kind }];
+  if (entry.event.ownerPath?.length) {
+    facts.push({ key: 'Owner', value: entry.event.ownerPath.join(' › ') });
+  }
+  if (entry.event.nodeName) facts.push({ key: 'Node', value: entry.event.nodeName });
+  facts.push({
+    key: 'Seen',
+    value:
+      entry.count > 1
+        ? `${entry.count} times, ${time(entry.firstAt)} to ${time(entry.lastAt)}`
+        : `once, ${time(entry.lastAt)}`,
+  });
+  return facts;
+}
+
+/** An issue in the header pattern of a thrown error, then its facts and actions. */
 export function IssueDetail(props: IssueDetailProps): JSX.Element {
   const subject = () => props.entry.subject?.deref();
   const guide = () => guideUrl(props.entry.event.code);
   return (
     <div data-solid-issues-detail>
-      <div data-solid-issues-detail-head>
-        <Badge type={BADGES[props.entry.event.severity]}>{props.entry.event.severity}</Badge>
-        <Text options={{ size: 'sm', weight: 'semibold', font: 'mono' }}>
+      <div data-solid-issues-head>
+        <div data-solid-issues-top>
+          <Glyph tone={TONES[props.entry.event.severity]} />
+          <span
+            data-solid-issues-severity={props.entry.event.severity}
+            data-solid-issues-severity-label
+          >
+            {props.entry.event.severity}
+          </span>
+          <span data-solid-issues-spacer />
+          <CopyReportButton
+            label="this issue"
+            text="Copy report"
+            report={() =>
+              issueReport({ entry: props.entry, guideUrl: guide(), route: pageRoute() })
+            }
+          />
+        </div>
+        <div data-solid-issues-code data-solid-issues-severity={props.entry.event.severity}>
           {props.entry.event.code}
-        </Text>
-        <CopyReportButton
-          label="this issue"
-          report={() => issueReport({ entry: props.entry, guideUrl: guide(), route: pageRoute() })}
-        />
+        </div>
+        <div data-solid-issues-detail-message>{issueText(props.entry.event)}</div>
       </div>
 
-      <Text data-solid-issues-detail-message options={{ size: 'xs' }}>
-        {issueText(props.entry.event)}
-      </Text>
+      <div data-solid-issues-body>
+        <dl data-solid-issues-facts>
+          <For each={issueFacts(props.entry)}>
+            {(fact) => (
+              <>
+                <dt>{fact.key}</dt>
+                <dd>{fact.value}</dd>
+              </>
+            )}
+          </For>
+        </dl>
 
-      <div data-solid-kv-table>
-        <div data-solid-kv-row>
-          <Text data-solid-kv-key options={{ size: 'xs', font: 'mono' }}>
-            Kind
-          </Text>
-          <Text data-solid-kv-value options={{ size: 'xs', font: 'mono' }}>
-            {props.entry.event.kind}
-          </Text>
+        <div data-solid-issues-actions>
+          <Show when={props.onViewOwner && subject()}>
+            {(current) => (
+              <HealthButton onClick={() => props.onViewOwner?.(ownerOf(current()))}>
+                <TreeIcon title="" aria-hidden="true" />
+                Show in the ownership tree
+              </HealthButton>
+            )}
+          </Show>
+          <Show when={props.onViewInGraph && subject() && isInGraph(subject()!) && subject()}>
+            {(current) => (
+              <HealthButton onClick={() => props.onViewInGraph?.(current())}>
+                <EyeIcon title="" aria-hidden="true" />
+                Show in the reactivity graph
+              </HealthButton>
+            )}
+          </Show>
+          <Show when={guide()}>
+            {(url) => (
+              <a data-solid-health-btn href={url()} target="_blank" rel="noreferrer">
+                Open the repair guide
+              </a>
+            )}
+          </Show>
         </div>
-        <Show when={props.entry.event.ownerPath?.length}>
-          <div data-solid-kv-row>
-            <Text data-solid-kv-key options={{ size: 'xs', font: 'mono' }}>
-              Owner
-            </Text>
-            <Text data-solid-kv-value options={{ size: 'xs', font: 'mono' }}>
-              {props.entry.event.ownerPath!.join(' › ')}
-            </Text>
-          </div>
-        </Show>
-        <Show when={props.entry.event.nodeName}>
-          {(name) => (
-            <div data-solid-kv-row>
-              <Text data-solid-kv-key options={{ size: 'xs', font: 'mono' }}>
-                Node
-              </Text>
-              <Text data-solid-kv-value options={{ size: 'xs', font: 'mono' }}>
-                {name()}
-              </Text>
-            </div>
-          )}
-        </Show>
-        <div data-solid-kv-row>
-          <Text data-solid-kv-key options={{ size: 'xs', font: 'mono' }}>
-            Seen
-          </Text>
-          <Text data-solid-kv-value options={{ size: 'xs', font: 'mono' }}>
-            {props.entry.count > 1
-              ? `${props.entry.count} times, ${time(props.entry.firstAt)} to ${time(props.entry.lastAt)}`
-              : `once, ${time(props.entry.lastAt)}`}
-          </Text>
-        </div>
-      </div>
 
-      <div data-solid-issues-actions>
-        <Show when={props.onViewOwner && subject()}>
-          {(current) => (
-            <button
-              type="button"
-              data-solid-issues-action
-              onClick={() => props.onViewOwner?.(ownerOf(current()))}
-            >
-              <TreeIcon title="" aria-hidden="true" />
-              <Text options={{ size: 'xs', weight: 'semibold' }}>Show in the ownership tree</Text>
-            </button>
-          )}
-        </Show>
-        <Show when={props.onViewInGraph && subject() && isInGraph(subject()!) && subject()}>
-          {(current) => (
-            <button
-              type="button"
-              data-solid-issues-action
-              onClick={() => props.onViewInGraph?.(current())}
-            >
-              <EyeIcon title="" aria-hidden="true" />
-              <Text options={{ size: 'xs', weight: 'semibold' }}>Show in the reactivity graph</Text>
-            </button>
-          )}
-        </Show>
-        <Show when={guide()}>
-          {(url) => (
-            <a data-solid-issues-action href={url()} target="_blank" rel="noreferrer">
-              <Text options={{ size: 'xs', weight: 'semibold' }}>Open the repair guide</Text>
-            </a>
-          )}
+        <Show when={props.entry.event.data && Object.keys(props.entry.event.data!).length}>
+          <div data-solid-issues-section>Data</div>
+          <pre data-solid-issues-data>{dataText(props.entry.event.data!)}</pre>
         </Show>
       </div>
-
-      <Show when={props.entry.event.data && Object.keys(props.entry.event.data!).length}>
-        <div data-solid-issues-data>
-          <Text options={{ size: 'xs', weight: 'semibold' }}>Data</Text>
-          <pre>
-            <Text options={{ size: 'xs', font: 'mono' }}>{dataText(props.entry.event.data!)}</Text>
-          </pre>
-        </div>
-      </Show>
     </div>
   );
 }

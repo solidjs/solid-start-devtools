@@ -319,7 +319,7 @@ interface ServerFunctionInstanceViewerProps {
   onDelete: () => void;
 }
 
-async function copyCallReport(instance: ServerFunctionInstance): Promise<string> {
+export async function copyCallReport(instance: ServerFunctionInstance): Promise<string> {
   const [requestBody, responseBody] = await Promise.all([
     readReportBody(instance.request.source),
     instance.response ? readReportBody(instance.response.source) : undefined,
@@ -328,7 +328,6 @@ async function copyCallReport(instance: ServerFunctionInstance): Promise<string>
 }
 
 function ServerFunctionInstanceViewer(props: ServerFunctionInstanceViewerProps): JSX.Element {
-  const [tab, setTab] = createSignal<'request' | 'response'>('request');
   return (
     <div data-solid-function-instance-viewer>
       <div data-solid-function-instance-viewer-nav>
@@ -353,16 +352,24 @@ function ServerFunctionInstanceViewer(props: ServerFunctionInstanceViewerProps):
           </IconButton>
         </div>
       </div>
-      <div data-solid-function-instance-viewer-content>
-        <TabGroup horizontal value={tab()} onChange={(value) => setTab(value ?? 'request')}>
-          <TabList>
-            <Tab value="request">Request</Tab>
-            <Tab value="response">Response</Tab>
-          </TabList>
-          <RequestViewer request={props.instance.request} />
-          <ResponseViewer request={props.instance.request} response={props.instance.response} />
-        </TabGroup>
-      </div>
+      <ServerFunctionContent instance={props.instance} />
+    </div>
+  );
+}
+
+/** The request and response of a call, in two tabs. */
+export function ServerFunctionContent(props: { instance: ServerFunctionInstance }): JSX.Element {
+  const [tab, setTab] = createSignal<'request' | 'response'>('request');
+  return (
+    <div data-solid-function-instance-viewer-content>
+      <TabGroup horizontal value={tab()} onChange={(value) => setTab(value ?? 'request')}>
+        <TabList>
+          <Tab value="request">Request</Tab>
+          <Tab value="response">Response</Tab>
+        </TabList>
+        <RequestViewer request={props.instance.request} />
+        <ResponseViewer request={props.instance.request} response={props.instance.response} />
+      </TabGroup>
     </div>
   );
 }

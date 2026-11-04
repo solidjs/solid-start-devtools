@@ -287,3 +287,17 @@ describe('ancestorsOf', () => {
     ]);
   });
 });
+
+describe('hideBuiltins', () => {
+  it('lifts the children of a built-in component to its parent', () => {
+    const inner = owner({ component: 'Row' });
+    const builtin = owner({ component: 'For', children: [inner] });
+    const app = owner({ component: 'App', children: [builtin] });
+    const tree = build([app], {
+      hideBuiltins: true,
+      isBuiltin: (item) => item._component?.name === 'For',
+    });
+    expect(tree.nodes.map((node) => node.name)).toEqual(['<App>', '<Row>']);
+    expect(tree.nodes[1]!.parentId).toBe(tree.nodes[0]!.id);
+  });
+});
