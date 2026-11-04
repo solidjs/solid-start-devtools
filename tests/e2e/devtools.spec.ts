@@ -521,7 +521,7 @@ test('lists runtime issues', async ({ page }) => {
   await expect(detail).toContainText('draft');
   await expect(detail.getByRole('link', { name: 'Open the repair guide' })).toHaveAttribute(
     'href',
-    /reactivity-diagnostics.*#strict_read_untracked/,
+    /diagnostics\/strict-read-untracked/,
   );
   await detail.getByRole('button', { name: 'Show in the ownership tree' }).click();
   await expect(page.locator('[data-solid-ownership-row][data-selected]')).toContainText(
