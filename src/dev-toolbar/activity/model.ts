@@ -57,9 +57,31 @@ export interface ActivityRow {
   subtitle: string;
   /** The right-aligned time or duration. */
   time: string;
+  /** Still going: a load in flight or a call with no answer yet. Its end is now. */
+  running?: boolean;
   /** How many entries the row folds. `1` for a plain row. */
   count: number;
   source: ActivitySource;
+}
+
+/** How far back the view looks. */
+export const WINDOW_MS = 30_000;
+
+/** The span the view shows: what ended since `since` and began by `until`. */
+export interface ViewRange {
+  since: number;
+  until: number;
+}
+
+/** The last `WINDOW_MS` up to `now`. */
+export function viewRange(now: number): ViewRange {
+  return { since: now - WINDOW_MS, until: now };
+}
+
+/** Whether a thing that began at `at` and ended at `end` belongs to the range. */
+export function inRange(at: number, end: number, range: ViewRange | undefined): boolean {
+  if (!range) return true;
+  return at <= range.until && end >= range.since;
 }
 
 export const GLYPHS = { act: 'A', srv: 'ƒ', wait: '⧗', err: '✕' } as const;
@@ -162,6 +184,34 @@ function singleGroup(entry: TimelineEntry): TimelineGroup {
   };
 }
 
+/** What the rows are built from. */
+export interface ActivitySources {
+  entries: readonly TimelineEntry[];
+  instances: Record<string, ServerFunctionInstance | undefined>;
+  records: readonly AsyncRecord[];
+  errors: readonly ErrorRecord[];
+  live: readonly LiveLoad[];
+}
+
+/**
+ * The sources of a paused view: everything the pause took, with the newest
+ * state of what is still in the stores. Nothing the stores evicted since
+ * disappears, and nothing new appears. Only a row already shown updates, such
+ * as a pending call that got its response.
+ */
+export function frozenSources(frozen: ActivitySources, current: ActivitySources): ActivitySources {
+  const entries: TimelineEntry[] = [];
+  const latest = new Map<number, TimelineEntry>();
+  for (const entry of current.entries) latest.set(entry.id, entry);
+  for (const entry of frozen.entries) entries.push(latest.get(entry.id) ?? entry);
+
+  const instances: Record<string, ServerFunctionInstance | undefined> = {};
+  for (const key of Object.keys(frozen.instances)) {
+    instances[key] = current.instances[key] ?? frozen.instances[key];
+  }
+  return { ...frozen, entries, instances };
+}
+
 export interface CollectInput {
   entries: readonly TimelineEntry[];
   instances: Record<string, ServerFunctionInstance | undefined>;
@@ -170,6 +220,10 @@ export interface CollectInput {
   live: readonly LiveLoad[];
   /** Show every entry as its own row, unnamed updates included. */
   unfold: boolean;
+  /** Keeps only what falls in the range. Everything when absent. */
+  range?: ViewRange;
+  /** The selection key of a row that stays listed whatever its age. */
+  pinned?: string;
 }
 
 export interface Collected {
@@ -223,6 +277,7 @@ function serverRow(
     title: callName(value),
     subtitle: owner ? `${status} · from ${owner}` : `${status} · ${value.request.source.method}`,
     time: duration === undefined ? (status === '…' ? 'live' : '') : ms(duration),
+    running: !value.response && status === '…',
     count: 1,
     source: { type: 'server', instance, value },
   };
@@ -279,6 +334,7 @@ function liveRow(load: LiveLoad): ActivityRow {
     title: `${load.name} loading`,
     subtitle: load.ownerPath.length ? load.ownerPath.join(' › ') : 'loading now',
     time: 'live',
+    running: true,
     count: 1,
     source: { type: 'live', load },
   };
@@ -294,6 +350,12 @@ export function collectRows(input: CollectInput): Collected {
   for (const entry of input.entries) {
     // A click that changed nothing, such as one on the toolbar itself, is never listed.
     if (isIdleEntry(entry)) continue;
+    if (
+      !inRange(entry.at, entry.at + entryDuration(entry), input.range) &&
+      actionKey(entry.id) !== input.pinned
+    ) {
+      continue;
+    }
     if (isUnnamedUpdate(entry)) {
       folded++;
       if (input.unfold) named.push(entry);
@@ -331,6 +393,22 @@ export function collectRows(input: CollectInput): Collected {
   // Thrown errors.
   for (let index = 0; index < input.errors.length; index++) {
     rows.push(errorRow(input.errors[index]!, index, input.entries));
+  }
+
+  // Only the actions fold, so the rest are cut to the range here.
+  if (input.range) {
+    const kept: ActivityRow[] = [];
+    for (const row of rows) {
+      if (row.source.type === 'action') kept.push(row);
+      else if (
+        row.members.includes(input.pinned ?? '') ||
+        inRange(row.at, row.running ? input.range.until : row.end, input.range)
+      ) {
+        kept.push(row);
+      }
+    }
+    rows.length = 0;
+    rows.push(...kept);
   }
 
   // Newest first. The sort is stable, so ties keep their source order.
@@ -482,61 +560,65 @@ export interface Lanes {
   async: LaneTick[];
 }
 
-/** The shortest span the strip covers, so one early entry does not fill it. */
-export const MIN_SPAN_MS = 1000;
-
-function percent(value: number, start: number, span: number): number {
-  return ((value - start) / span) * 100;
+/** A bar from `at` to `end`, clipped to the strip, or `undefined` when it lies outside. */
+function clipBar(
+  at: number,
+  end: number,
+  lanes: Pick<Lanes, 'start' | 'end'>,
+): { left: number; width: number } | undefined {
+  if (end < lanes.start || at > lanes.end) return undefined;
+  const span = lanes.end - lanes.start;
+  const from = Math.max(at, lanes.start);
+  const to = Math.min(Math.max(end, at), lanes.end);
+  return { left: ((from - lanes.start) / span) * 100, width: ((to - from) / span) * 100 };
 }
 
-/** Positions every item of the three lanes along the time range they cover. */
-export function layoutLanes(rows: readonly ActivityRow[]): Lanes {
-  const lanes: Lanes = { start: 0, end: MIN_SPAN_MS, actions: [], server: [], async: [] };
-  if (!rows.length) return lanes;
-
-  // The range runs from the oldest start to the latest end.
-  let start = Infinity;
-  let end = -Infinity;
-  for (const row of rows) {
-    if (row.kind === 'error') continue;
-    start = Math.min(start, row.at);
-    end = Math.max(end, row.end);
-  }
-  if (!Number.isFinite(start)) return lanes;
-  end = Math.max(end, start + MIN_SPAN_MS);
-  const span = end - start;
-  lanes.start = start;
-  lanes.end = end;
+/** Positions the items of the three lanes along the last `WINDOW_MS` up to `now`. */
+export function layoutLanes(rows: readonly ActivityRow[], now: number): Lanes {
+  const lanes: Lanes = { start: now - WINDOW_MS, end: now, actions: [], server: [], async: [] };
 
   for (const row of rows) {
     const { source } = row;
     if (source.type === 'action') {
-      // Every entry of a fold is its own tick.
+      // Every entry of a fold is its own tick, and a tick before the start is dropped.
       for (const entry of source.entries) {
+        const at = clipBar(entry.at, entry.at, lanes);
+        if (!at) continue;
         lanes.actions.push({
-          left: percent(entry.at, start, span),
+          left: at.left,
           width: 0,
           big: entryRunCount(entry) >= BIG_RUNS,
           member: actionKey(entry.id),
         });
       }
-    } else if (row.kind === 'server') {
-      lanes.server.push({
-        left: percent(row.at, start, span),
-        width: ((row.end - row.at) / span) * 100,
-        big: false,
-        member: row.members[0]!,
-      });
-    } else if (row.kind === 'async') {
-      lanes.async.push({
-        left: percent(row.at, start, span),
-        width: ((row.end - row.at) / span) * 100,
-        big: false,
-        member: row.members[0]!,
-      });
+    } else if (row.kind === 'server' || row.kind === 'async') {
+      const bar = clipBar(row.at, row.running ? now : row.end, lanes);
+      if (!bar) continue;
+      const tick = { left: bar.left, width: bar.width, big: false, member: row.members[0]! };
+      if (row.kind === 'server') lanes.server.push(tick);
+      else lanes.async.push(tick);
     }
   }
   return lanes;
+}
+
+export interface AxisMark {
+  label: string;
+  /** Percent of the strip. */
+  left: number;
+}
+
+/** The labels under the strip, one every `stepMs`, ending with `now`. */
+export function axisMarks(windowMs = WINDOW_MS, stepMs = 10_000): AxisMark[] {
+  const marks: AxisMark[] = [];
+  for (let back = windowMs; back > 0; back -= stepMs) {
+    marks.push({
+      label: `\u2212${Math.round(back / 1000)}s`,
+      left: ((windowMs - back) / windowMs) * 100,
+    });
+  }
+  marks.push({ label: 'now', left: 100 });
+  return marks;
 }
 
 /** Percent of the strip to a time. */

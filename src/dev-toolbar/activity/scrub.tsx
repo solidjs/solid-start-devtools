@@ -1,6 +1,7 @@
 import type { JSX } from '@solidjs/web';
 import { For, Show } from 'solid-js';
 import {
+  axisMarks,
   makeWindow,
   shiftWindow,
   timeAt,
@@ -16,6 +17,8 @@ const KEY_STEP = 0.02;
 /** Pixels a drag has to travel before it counts as a drag and not a click. */
 const DRAG_SLOP = 3;
 
+const MARKS = axisMarks();
+
 type DragMode = 'new' | 'move' | 'from' | 'to';
 
 export interface ScrubProps {
@@ -27,15 +30,15 @@ export interface ScrubProps {
 
 function Ticks(props: { ticks: LaneTick[]; selected: string | undefined }): JSX.Element {
   return (
-    <For each={props.ticks}>
+    <For each={props.ticks} keyed={(tick) => tick.member}>
       {(tick) => (
         <span
           data-solid-activity-tick
-          data-big={tick.big ? '' : undefined}
-          data-selected={props.selected === tick.member ? '' : undefined}
+          data-big={tick().big ? '' : undefined}
+          data-selected={props.selected === tick().member ? '' : undefined}
           style={{
-            left: `${tick.left}%`,
-            width: tick.width ? `${tick.width}%` : undefined,
+            left: `${tick().left}%`,
+            width: tick().width ? `${tick().width}%` : undefined,
           }}
         />
       )}
@@ -122,6 +125,21 @@ export function Scrub(props: ScrubProps): JSX.Element {
       <div data-solid-activity-lane="async">
         <label>Async</label>
         <Ticks ticks={props.lanes.async} selected={props.selected} />
+      </div>
+      <div data-solid-activity-grid aria-hidden="true">
+        <For each={MARKS}>
+          {(mark) => <span data-solid-activity-gridline style={{ left: `${mark.left}%` }} />}
+        </For>
+        <span data-solid-activity-nowline />
+      </div>
+      <div data-solid-activity-axis aria-hidden="true">
+        <For each={MARKS}>
+          {(mark) => (
+            <span data-solid-activity-axis-label style={{ left: `${mark.left}%` }}>
+              {mark.label}
+            </span>
+          )}
+        </For>
       </div>
       <div
         ref={track}

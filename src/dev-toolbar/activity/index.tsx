@@ -1,5 +1,6 @@
 import type { JSX } from '@solidjs/web';
 import { createEffect, createMemo, createSignal, For, getOwner, onCleanup, Show } from 'solid-js';
+import { PauseIcon, PlayIcon } from '../icons.js';
 import Placeholder from '../../ui/Placeholder.js';
 import { ResizeHandle } from '../../ui/ResizeHandle.js';
 import { Text } from '../../ui/Text.js';
@@ -20,8 +21,12 @@ import {
   bucketRows,
   collectRows,
   GLYPHS,
+  frozenSources,
   inWindow,
+  type ActivitySources,
   layoutLanes,
+  viewRange,
+  WINDOW_MS,
   matchesFilter,
   matchesOwner,
   resolveSelection,
@@ -43,7 +48,7 @@ const FILTERS: { value: ActivityFilter; label: string }[] = [
 ];
 
 /** How often the group labels and the elapsed time of what loads now are redrawn. */
-const TICK_MS = 1000;
+const TICK_MS = 250;
 
 export interface ActivityFocus {
   /** Select the action that began with this interaction or frame. */
@@ -119,6 +124,11 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
   const [owner, setOwner] = createSignal<string>();
   const [live, setLive] = createSignal<LiveLoad[]>([]);
   const [now, setNow] = createSignal(performance.now());
+  const [paused, setPaused] = createSignal(false);
+  // What the list showed when it was paused.
+  const [frozenSrc, setFrozenSrc] = createSignal<ActivitySources>();
+  // The clock reads this outside any tracking scope.
+  let frozen = false;
   const [observed, setObserved] = createSignal(0);
   const since = new Map<string, number>();
   const memory = new ValueMemory();
@@ -152,7 +162,9 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
       }
       const stop = startReactivityTracking();
       const unsubscribe = subscribeReactivityGraph(read);
-      const timer = setInterval(() => setNow(performance.now()), TICK_MS);
+      const timer = setInterval(() => {
+        if (!frozen) setNow(performance.now());
+      }, TICK_MS);
       read();
       return () => {
         clearInterval(timer);
@@ -195,16 +207,59 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
     },
   );
 
-  const collected = createMemo(() =>
-    collectRows({
+  // The strip and the list cover the last `WINDOW_MS`. While paused nothing newer than the pause shows.
+  const range = createMemo(() => {
+    const current = viewRange(now());
+    return paused() ? current : { ...current, until: Number.POSITIVE_INFINITY };
+  });
+
+  // A picked time range that has slid out of the strip is dropped.
+  createEffect(
+    () => {
+      const picked = timeRange();
+      return picked !== undefined && picked.to < now() - WINDOW_MS;
+    },
+    (stale) => {
+      if (stale) setTimeRange(undefined);
+    },
+  );
+
+  function togglePause(): void {
+    const next = !paused();
+    frozen = next;
+    // Pausing keeps what is shown, so the stores can evict without the view losing rows.
+    setFrozenSrc(
+      next
+        ? {
+            entries: props.entries,
+            instances: props.instances,
+            records: props.records,
+            errors: props.errors,
+            live: live(),
+          }
+        : undefined,
+    );
+    // Resuming jumps back to live.
+    if (!next) setNow(performance.now());
+    setPaused(next);
+  }
+
+  const collected = createMemo(() => {
+    const current: ActivitySources = {
       entries: props.entries,
       instances: props.instances,
       records: props.records,
       errors: props.errors,
       live: live(),
+    };
+    const frozenNow = frozenSrc();
+    return collectRows({
+      ...(frozenNow ? frozenSources(frozenNow, current) : current),
       unfold: unfold(),
-    }),
-  );
+      range: range(),
+      pinned: selected(),
+    });
+  });
 
   const shown = createMemo(() => {
     const rows: ActivityRow[] = [];
@@ -221,7 +276,7 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
   });
 
   const buckets = createMemo(() => bucketRows(shown(), now()));
-  const lanes = createMemo(() => layoutLanes(collected().rows));
+  const lanes = createMemo(() => layoutLanes(collected().rows, now()));
   const selection = createMemo(() => resolveSelection(collected().rows, selected()));
 
   // Each detail reads its own memo, which holds the same object while the list
@@ -338,13 +393,27 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
                       type="button"
                       data-solid-activity-chip
                       data-clear
-                      disabled={!collected().rows.length}
+                      disabled={!props.entries.length && !props.records.length}
                       title="Clear the timeline and the async history"
                       onClick={clear}
                     >
                       Clear
                     </button>
                   </Show>
+                  <button
+                    type="button"
+                    data-solid-activity-pause
+                    aria-pressed={paused() ? 'true' : 'false'}
+                    aria-label={paused() ? 'Resume live updates' : 'Pause live updates'}
+                    title={paused() ? 'Resume live updates' : 'Pause live updates'}
+                    onClick={togglePause}
+                  >
+                    <Show
+                      when={paused()}
+                      fallback={<PauseIcon title="Pause live updates" />}
+                      children={<PlayIcon title="Resume live updates" />}
+                    />
+                  </button>
                 </div>
 
                 <Show
@@ -353,7 +422,7 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
                     <div data-solid-activity-empty>
                       {collected().rows.length
                         ? 'Nothing matches this filter.'
-                        : 'Interact with the app to see what each action re-ran.'}
+                        : 'Nothing happened in the last 30 seconds.'}
                     </div>
                   }
                 >

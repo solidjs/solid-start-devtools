@@ -620,3 +620,78 @@
   color: var(--start-dt-text-muted);
   padding: 2px 0;
 }
+
+/* the time axis: gridlines every 10s through the lanes, labels under them */
+[data-solid-activity-grid] {
+  position: absolute;
+  top: 0;
+  bottom: 20px;
+  left: 84px;
+  right: 14px;
+  pointer-events: none;
+}
+
+[data-solid-activity-gridline] {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--start-dt-line);
+}
+
+[data-solid-activity-nowline] {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 1px;
+  background: var(--start-dt-line-2);
+}
+
+[data-solid-activity-axis] {
+  position: relative;
+  height: 13px;
+  margin-top: 2px;
+}
+
+[data-solid-activity-axis-label] {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font: 9.5px/13px var(--start-dt-mono);
+  color: var(--start-dt-faint);
+  white-space: nowrap;
+}
+
+[data-solid-activity-axis-label]:last-child {
+  transform: translateX(-100%);
+}
+
+[data-solid-activity-axis-label]:first-child {
+  transform: none;
+}
+
+[data-solid-activity-pause] {
+  margin-left: auto;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 7px;
+  color: var(--start-dt-text-muted);
+}
+
+[data-solid-activity-pause]:hover {
+  background: oklch(1 0 0 / 0.06);
+  color: var(--start-dt-text);
+}
+
+[data-solid-activity-pause][aria-pressed='true'] {
+  color: var(--start-dt-solid);
+}
+
+[data-solid-activity-chip][data-ghost] ~ [data-solid-activity-pause] {
+  margin-left: 0;
+}

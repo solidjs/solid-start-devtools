@@ -4,6 +4,7 @@ import type { ErrorRecord } from '../error-record.js';
 import type { ServerFunctionInstance } from '../functions/index.js';
 import type { TimelineEntry, TimelineRun } from '../timeline/tracker.js';
 import {
+  axisMarks,
   bucketLabel,
   bucketRows,
   callBars,
@@ -11,6 +12,7 @@ import {
   countNames,
   entryLocation,
   firstMemoDelta,
+  frozenSources,
   handlerLocation,
   inWindow,
   layoutLanes,
@@ -24,6 +26,8 @@ import {
   shiftWindow,
   summarizeChain,
   ValueMemory,
+  viewRange,
+  WINDOW_MS,
   type ActivityRow,
 } from './model.js';
 
@@ -271,43 +275,165 @@ describe('time groups', () => {
 });
 
 describe('lanes', () => {
-  it('places ticks by time and marks the actions with many re-runs', () => {
+  const NOW = 100_000;
+
+  it('places ticks and bars along the last 30 seconds', () => {
     const many = Array.from({ length: 9 }, (_, i) => run(i, 'm', 'memo', 0, 1));
     const { rows } = collect({
       entries: [
-        entry(2, 'big', 1000, { runs: many, flushMs: 0 }),
-        entry(1, 'small', 0, { flushMs: 0 }),
+        entry(2, 'big', NOW - 15_000, { runs: many, flushMs: 0 }),
+        entry(1, 'small', NOW, { flushMs: 0 }),
       ],
-      instances: { 'fn#1': server(500, 250) },
+      instances: { 'fn#1': server(NOW - 24_000, 3000) },
       records: [
         {
           type: 'wait',
           id: 1,
-          at: 250,
-          event: { blockers: [], holdMs: 500 },
+          at: NOW - 15_000,
+          event: { blockers: [], holdMs: 6000 },
         } as unknown as AsyncRecord,
       ],
     });
-    const lanes = layoutLanes(rows);
-    expect(lanes.start).toBe(0);
-    expect(lanes.end).toBe(1000);
+    const lanes = layoutLanes(rows, NOW);
+    expect(lanes.start).toBe(NOW - WINDOW_MS);
+    expect(lanes.end).toBe(NOW);
     expect(lanes.actions.map((tick) => [tick.left, tick.big])).toEqual([
-      [100, true],
-      [0, false],
+      [100, false],
+      [50, true],
     ]);
-    expect(lanes.server).toEqual([{ left: 50, width: 25, big: false, member: 's:fn#1' }]);
-    expect(lanes.async).toEqual([{ left: 25, width: 50, big: false, member: 'w:1' }]);
+    expect(lanes.server).toEqual([{ left: 20, width: 10, big: false, member: 's:fn#1' }]);
+    expect(lanes.async).toEqual([{ left: 50, width: 20, big: false, member: 'w:1' }]);
   });
 
-  it('gives an empty session a range to draw', () => {
-    const lanes = layoutLanes([]);
-    expect(lanes.end - lanes.start).toBeGreaterThan(0);
+  it('drops ticks before the start and clips bars that cross it', () => {
+    const { rows } = collect({
+      entries: [entry(1, 'old', NOW - 40_000, { flushMs: 0 })],
+      instances: {
+        'fn#1': server(NOW - 35_000, 10_000),
+        'fn#2': server(NOW - 50_000, 5000),
+      },
+    });
+    const lanes = layoutLanes(rows, NOW);
+    expect(lanes.actions).toEqual([]);
+    expect(lanes.server).toHaveLength(1);
+    expect(lanes.server[0]).toMatchObject({ left: 0 });
+    expect(lanes.server[0]!.width).toBeCloseTo((5000 / WINDOW_MS) * 100);
+  });
+
+  it('runs a pending call and a load in flight up to now', () => {
+    const { rows } = collect({
+      instances: { 'fn#1': server(NOW - 3000) },
+      live: [{ id: 'n', name: 'user', ownerPath: [], since: NOW - 6000, raw: {} }],
+    });
+    const lanes = layoutLanes(rows, NOW);
+    expect(lanes.server[0]).toMatchObject({ left: 90, width: 10 });
+    expect(lanes.async[0]).toMatchObject({ left: 80, width: 20 });
+  });
+
+  it('gives an empty session an empty strip', () => {
+    const lanes = layoutLanes([], NOW);
+    expect(lanes.end - lanes.start).toBe(WINDOW_MS);
     expect(lanes.actions).toEqual([]);
   });
 
   it('ticks every entry of a fold', () => {
-    const { rows } = collect({ entries: [entry(2, 'tick', 200), entry(1, 'tick', 100)] });
-    expect(layoutLanes(rows).actions).toHaveLength(2);
+    const { rows } = collect({
+      entries: [entry(2, 'tick', NOW - 100), entry(1, 'tick', NOW - 200)],
+    });
+    expect(layoutLanes(rows, NOW).actions).toHaveLength(2);
+  });
+});
+
+describe('axis', () => {
+  it('labels every 10 seconds and ends with now', () => {
+    expect(axisMarks()).toEqual([
+      { label: '\u221230s', left: 0 },
+      { label: '\u221220s', left: (10 / 30) * 100 },
+      { label: '\u221210s', left: (20 / 30) * 100 },
+      { label: 'now', left: 100 },
+    ]);
+  });
+});
+
+describe('a paused view', () => {
+  const NOW = 100_000;
+  const range = { since: NOW - WINDOW_MS, until: NOW };
+
+  it('keeps the rows the stores evicted and the pending call that answered', () => {
+    const empty = { entries: [], instances: {}, records: [], errors: [], live: [] };
+    const frozen = {
+      ...empty,
+      entries: [entry(2, 'tick', NOW - 100), entry(1, 'tick', NOW - 200)],
+      instances: { 'fn#1': server(NOW - 1000) },
+    };
+    // The store evicted both entries and a response arrived for the call.
+    const current = {
+      ...empty,
+      entries: [entry(9, 'new', NOW + 500)],
+      instances: { 'fn#1': server(NOW - 1000, 40) },
+    };
+    const sources = frozenSources(frozen, current);
+    const { rows, folded } = collectRows({ ...sources, unfold: false, range });
+    expect(rows.map((row) => row.title).sort()).toEqual(['refundOrder', 'tick']);
+    expect(rows.find((row) => row.kind === 'server')?.time).toBe('40.0ms');
+    expect(rows.find((row) => row.kind === 'action')?.count).toBe(2);
+    expect(folded).toBe(1);
+  });
+});
+
+describe('the last 30 seconds', () => {
+  const NOW = 100_000;
+  const range = viewRange(NOW);
+  const entries = [
+    entry(3, 'new', NOW - 1000),
+    entry(2, 'edge', NOW - 29_000),
+    entry(1, 'old', NOW - 60_000),
+  ];
+
+  it('lists only what ended within the window', () => {
+    const { rows } = collect({ entries, range });
+    expect(rows.map((row) => row.title)).toEqual(['new', 'edge']);
+  });
+
+  it('keeps a thing that began earlier but ended inside', () => {
+    const { rows } = collect({
+      entries: [entry(1, 'long', NOW - 40_000, { flushMs: 20_000 })],
+      range,
+    });
+    expect(rows).toHaveLength(1);
+  });
+
+  it('keeps the pinned row however old it is', () => {
+    const { rows } = collect({ entries, range, pinned: 'a:1' });
+    expect(rows.map((row) => row.title)).toEqual(['new', 'edge', 'old']);
+    const call = collect({
+      instances: { 'fn#1': server(NOW - 90_000, 5) },
+      range,
+      pinned: 's:fn#1',
+    });
+    expect(call.rows).toHaveLength(1);
+  });
+
+  it('counts only the folded rows in the window', () => {
+    const repeats = [
+      entry(4, 'tick', NOW - 100),
+      entry(3, 'tick', NOW - 200),
+      entry(2, 'tick', NOW - 50_000),
+      entry(1, 'tick', NOW - 60_000),
+    ];
+    expect(collect({ entries: repeats, range }).folded).toBe(1);
+    expect(collect({ entries: repeats }).folded).toBe(3);
+  });
+
+  it('counts a running call as now', () => {
+    const { rows } = collect({ instances: { 'fn#1': server(NOW - 90_000) }, range });
+    expect(rows).toHaveLength(1);
+  });
+
+  it('shows nothing newer than the pause', () => {
+    const paused = { since: NOW - WINDOW_MS, until: NOW - 5000 };
+    const { rows } = collect({ entries, range: paused });
+    expect(rows.map((row) => row.title)).toEqual(['edge']);
   });
 });
 
