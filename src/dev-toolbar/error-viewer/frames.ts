@@ -9,7 +9,9 @@ const LIBRARY_PATTERNS = [
   /[\\/]solid-js(?:[\\/]|$)/,
   /[\\/]@solidjs[\\/]/,
   /[\\/]start-devtools[\\/]/,
-  /[\\/]solid-start-devtools[\\/]/,
+  // A linked checkout of the devtools. Only its code: the examples in the
+  // checkout are apps, and a server stack names them by their absolute path.
+  /[\\/]solid-start-devtools[\\/](?:dist|src)[\\/]/,
 ];
 
 /** Whether a frame's file belongs to a library or to the devtools instead of the app. */
