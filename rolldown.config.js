@@ -115,8 +115,15 @@ export default defineConfig([
     generate: 'ssr',
     server: true,
   }),
+  config({
+    input: 'src/protocol.ts',
+    entryFileNames: 'protocol.js',
+    chunkFileNames: 'protocol-chunks/[name]-[hash].js',
+    generate: 'ssr',
+    server: true,
+  }),
   {
-    input: 'src/index.tsx',
+    input: ['src/index.tsx', 'src/protocol.ts'],
     output: {
       format: 'esm',
       dir: 'dist/types',

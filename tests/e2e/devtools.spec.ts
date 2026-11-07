@@ -1092,3 +1092,32 @@ test('removes the toolbar from production bundles', async () => {
     await rm(outDir, { recursive: true, force: true });
   }
 });
+
+test('shows the errors the dev server sent', async ({ page }) => {
+  await page.goto('/?dev-server');
+
+  await expect(page.getByRole('tab', { name: 'Health', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.locator('[data-solid-health-error-row]')).toContainText(
+    'Server render: rendered on the server',
+  );
+  await expect(page.locator('[data-solid-error-viewer-error-info-message]')).toHaveText(
+    'rendered on the server',
+  );
+});
+
+test('opens files through the dev server endpoint', async ({ page }) => {
+  await page.goto('/?dev-server');
+  await page.locator('#throw-client-error').click();
+  await page.locator('[data-solid-health-error-row]', { hasText: 'client boom' }).click();
+
+  const open = page.locator('button[title^="Open "][title$=" in editor"]').first();
+  await open.click();
+
+  // One request with the location as the frame gave it, not one per sub-path.
+  await expect
+    .poll(async () => (await page.request.get('/__test/opened')).json())
+    .toEqual([expect.stringContaining('app.tsx')]);
+});

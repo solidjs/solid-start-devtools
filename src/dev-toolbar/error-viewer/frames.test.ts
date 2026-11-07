@@ -17,11 +17,13 @@ describe('isLibraryFile', () => {
     );
     expect(isLibraryFile('/proj/packages/solid-js/src/index.ts')).toBe(true);
     expect(isLibraryFile('/proj/node_modules/@solidjs/start-devtools/dist/index.js')).toBe(true);
+    expect(isLibraryFile('/code/solid-start-devtools/dist/index.js')).toBe(true);
   });
 
   it('keeps app files and unknown files', () => {
     expect(isLibraryFile('http://localhost:3000/src/app.tsx')).toBe(false);
     expect(isLibraryFile('/proj/src/solid-js-notes.ts')).toBe(false);
+    expect(isLibraryFile('/code/solid-start-devtools/examples/demo/src/App.tsx')).toBe(false);
     expect(isLibraryFile(undefined)).toBe(false);
   });
 });

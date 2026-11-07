@@ -1,9 +1,20 @@
+import { OPEN_IN_EDITOR_PATH } from '../protocol.js';
+import { devServerInfo } from './dev-server.js';
+
 /**
  * Asks the dev server to open the file in the user's IDE.
- * Vite serves the `/__open-in-editor` endpoint in development.
+ *
+ * When `@solidjs/vite-plugin` connected the toolbar, its endpoint resolves the
+ * path against the Vite root, so one request is enough.
  */
 export function openInEditor(location: string): void {
-  // Vite resolves relative paths against its server root (server.config.root).
+  if (devServerInfo()) {
+    void fetch(`${OPEN_IN_EDITOR_PATH}?file=${encodeURIComponent(location)}`).catch(() => {});
+    return;
+  }
+
+  // Without the plugin, Vite's own `/__open-in-editor` endpoint resolves
+  // relative paths against its server root, which the toolbar does not know.
   // In monorepos or subproject setups (like examples/explorer), `location` may
   // include parent path segments (e.g. 'examples/explorer/src/App.tsx') while
   // Vite's root is already set to 'examples/explorer'. We dispatch the full location
