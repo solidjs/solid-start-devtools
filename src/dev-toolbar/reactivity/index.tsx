@@ -145,6 +145,10 @@ export interface ReactivityViewerProps {
   ownerFilter?: object;
   /** Filters nodes to those owned by or under a specific component name. */
   componentFilter?: string;
+  /** Drops the component filter set by the element inspector. */
+  onClearComponentFilter?: () => void;
+  /** Shown first in the toolbar, such as the Structure view's mode chips. */
+  lead?: JSX.Element;
 }
 
 function isDescendantOf(owner: object | undefined, target: object): boolean {
@@ -488,6 +492,7 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
       <div data-solid-dev-toolbar-panel>
         <div data-solid-reactivity-viewer>
           <div data-solid-reactivity-nav>
+            {props.lead}
             <input
               data-solid-reactivity-search
               type="search"
@@ -517,6 +522,23 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
                 )}
               </For>
             </div>
+            <Show when={props.componentFilter}>
+              {(name) => (
+                <span data-solid-reactivity-component-filter>
+                  <Text
+                    options={{ size: 'xs', font: 'mono', wrap: 'nowrap' }}
+                  >{`Under ${name()}`}</Text>
+                  <button
+                    type="button"
+                    title="Clear component filter"
+                    aria-label="Clear component filter"
+                    onClick={() => props.onClearComponentFilter?.()}
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+            </Show>
             <div data-solid-reactivity-nav-actions>
               <Text data-solid-reactivity-count options={{ size: 'xs', font: 'mono' }}>
                 {`${visibleNodes().length} nodes / ${visibleEdges().length} edges`}

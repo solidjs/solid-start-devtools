@@ -7,12 +7,27 @@ import {
   type WaterfallRecord,
 } from 'solid-js/attribution';
 import { appOwnerPath } from '../issues/tracker.js';
+import { WINDOW_MS } from '../timeline/tracker.js';
 
 /** A fallback shown for less than this reads as a flash, as the runtime's `FALLBACK_FLASH` finding counts it. */
 export const FLASH_MS = 150;
 
-/** Most records the panel keeps. The oldest go first. */
-export const MAX_RECORDS = 200;
+/**
+ * Whether the node sits under an owner the toolbar excluded with
+ * `OBSERVE.exclude`. The runtime still sends the records of such a node, so
+ * the history asks the runtime's own answer by owner identity.
+ */
+function isToolbarNode(node: object | undefined): boolean {
+  if (!node) return false;
+  try {
+    return !!OBSERVE?.isExcluded?.(node as never);
+  } catch {
+    return false;
+  }
+}
+
+/** A safety cap that only applies in a runaway. */
+export const MAX_RECORDS = 1000;
 
 /** One thing that happened while the app waited on async work. */
 export type AsyncRecord =
@@ -73,13 +88,28 @@ export class AsyncHistory {
   private sources = new WeakSet<object>();
   private seenChains = new WeakSet<WaterfallRecord>();
 
-  constructor(private readonly max = MAX_RECORDS) {}
+  constructor(
+    private readonly max = MAX_RECORDS,
+    private readonly windowMs = WINDOW_MS,
+  ) {}
 
   private add(record: AsyncRecord): void {
-    this.records = [record, ...this.records].slice(0, this.max);
+    this.records = [record, ...this.records];
+    this.prune(record.at);
+  }
+
+  /** Drops the records that began before the window ending at `now`, and the oldest past the safety cap. */
+  prune(now: number): boolean {
+    const cutoff = now - this.windowMs;
+    let keep = this.records.length;
+    while (keep > 0 && (keep > this.max || this.records[keep - 1]!.at < cutoff)) keep--;
+    if (keep === this.records.length) return false;
+    this.records = this.records.slice(0, keep);
+    return true;
   }
 
   flight(event: FlightEvent, node: object | undefined): void {
+    if (isToolbarNode(node)) return;
     if (node) this.sources.add(node);
     this.add({
       type: 'load',
@@ -104,6 +134,7 @@ export class AsyncHistory {
   }
 
   fallback(event: FallbackEvent, node: object | undefined): void {
+    if (isToolbarNode(node)) return;
     this.add({
       type: 'fallback',
       id: this.nextId++,

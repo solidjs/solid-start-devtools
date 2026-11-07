@@ -1,6 +1,7 @@
 import type { JSX } from '@solidjs/web';
 import { createSignal, onCleanup, Show } from 'solid-js';
 import IconButton from '../../ui/IconButton.js';
+import { HealthButton } from '../health/HealthButton.js';
 import { CheckIcon, CopyIcon } from '../icons.js';
 import './styles.css';
 
@@ -36,6 +37,8 @@ export interface CopyReportButtonProps {
   report: () => string | Promise<string>;
   /** What the button copies, such as "this error". */
   label: string;
+  /** Shows a button with this text beside the icon, in place of the icon alone. */
+  text?: string;
 }
 
 /** Copies a Markdown report for an agent, such as Claude Code, to read. */
@@ -68,6 +71,22 @@ export function CopyReportButton(props: CopyReportButtonProps): JSX.Element {
         return `Copy ${props.label} for an agent`;
     }
   };
+
+  if (props.text) {
+    return (
+      <HealthButton
+        data-solid-copy-report={state()}
+        title={title()}
+        disabled={state() === 'busy'}
+        onClick={copy}
+      >
+        <Show when={state() === 'copied'} fallback={<CopyIcon title="" aria-hidden="true" />}>
+          <CheckIcon title="" aria-hidden="true" />
+        </Show>
+        {props.text}
+      </HealthButton>
+    );
+  }
 
   return (
     <IconButton

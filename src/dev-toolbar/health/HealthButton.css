@@ -1,0 +1,79 @@
+/* The prototype's `.btn`: 28px tall, hairline border, muted until hovered. */
+[data-solid-health-btn] {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+
+  height: 28px;
+  padding: 0 10px;
+
+  border: 1px solid var(--start-dt-line-2);
+  border-radius: 7px;
+  background: none;
+  color: var(--start-dt-text-muted);
+
+  font: inherit;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  text-decoration: none;
+  white-space: nowrap;
+
+  cursor: pointer;
+}
+
+[data-solid-health-btn]:hover:not(:disabled) {
+  color: var(--start-dt-text);
+  background: oklch(1 0 0 / 0.05);
+}
+
+[data-solid-health-btn]:focus-visible {
+  outline: 2px solid var(--start-dt-solid);
+  outline-offset: 1px;
+}
+
+[data-solid-health-btn]:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+[data-solid-health-btn][data-icon] {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+}
+
+[data-solid-health-btn][data-primary] {
+  background: var(--start-dt-solid);
+  color: oklch(0.16 0.02 265);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+[data-solid-health-btn][data-primary]:hover:not(:disabled) {
+  color: oklch(0.16 0.02 265);
+  background: var(--start-dt-solid);
+  filter: brightness(1.1);
+}
+
+/* An icon alone is 16px, beside a label it is 14px. */
+[data-solid-dev-toolbar] [data-solid-health-btn] svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+[data-solid-dev-toolbar] [data-solid-health-btn][data-icon] svg {
+  width: 16px;
+  height: 16px;
+}
+
+[data-solid-health-btn][data-solid-copy-report='copied'] {
+  color: var(--start-dt-green);
+}
+
+[data-solid-health-btn][data-solid-copy-report='failed'] {
+  color: var(--start-dt-red);
+}

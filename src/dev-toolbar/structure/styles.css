@@ -1,0 +1,48 @@
+/* The chips of the Structure view, in the tree pane and in the graph toolbar. */
+
+[data-solid-structure-chip] {
+  padding: 3px 9px;
+
+  border: 1px solid var(--start-dt-line-2);
+  border-radius: 99px;
+  background: none;
+  color: var(--start-dt-text-muted);
+
+  font: inherit;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 11.5px;
+  line-height: 1.45;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: none;
+}
+
+[data-solid-structure-chip][aria-selected='true'] {
+  border-color: transparent;
+  background: var(--start-dt-raise-2);
+  color: var(--start-dt-text);
+}
+
+[data-solid-structure-chip][data-ghost] {
+  margin-left: auto;
+
+  border-style: dashed;
+  color: var(--start-dt-faint);
+}
+
+[data-solid-structure-chip][data-ghost][aria-pressed='true'] {
+  background: oklch(1 0 0 / 0.05);
+  color: var(--start-dt-text-muted);
+}
+
+[data-solid-structure-chip]:focus-visible {
+  outline: 1px solid var(--start-dt-solid);
+  outline-offset: 1px;
+}
+
+[data-solid-structure-modes] {
+  display: contents;
+}

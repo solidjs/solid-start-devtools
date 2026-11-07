@@ -169,6 +169,45 @@ describe('TimelineBuilder', () => {
     }
     expect(builder.snapshot().map((entry) => entry.origin?.name)).toEqual(['e3', 'e2']);
   });
+
+  function act(builder: TimelineBuilder, at: number): void {
+    builder.rerun(
+      rerun({ run: at, at, interaction: { kind: 'interaction', name: `e${at}`, at } }),
+      undefined,
+    );
+  }
+
+  it('keeps every entry of the last 30 seconds and drops older ones', () => {
+    const builder = new TimelineBuilder();
+    for (let at = 1000; at <= 61_000; at += 1000) act(builder, at);
+    const names = builder.snapshot(61_000).map((entry) => entry.origin?.at);
+    // 31 entries from 31000 to 61000, newest first.
+    expect(names).toHaveLength(31);
+    expect(names[0]).toBe(61_000);
+    expect(names[30]).toBe(31_000);
+  });
+
+  it('does not thin out a repeated label inside the window', () => {
+    const builder = new TimelineBuilder();
+    for (let i = 0; i < 1800; i++) act(builder, 1000 + i * 16);
+    expect(builder.snapshot(1000 + 1799 * 16)).toHaveLength(1800);
+  });
+
+  it('ages entries out of a snapshot even when nothing new arrived', () => {
+    const builder = new TimelineBuilder();
+    act(builder, 1000);
+    const first = builder.snapshot(2000);
+    expect(first).toHaveLength(1);
+    const later = builder.snapshot(40_000);
+    expect(later).toHaveLength(0);
+    expect(later).not.toBe(first);
+  });
+
+  it('caps a runaway at the safety limit, dropping the oldest', () => {
+    const builder = new TimelineBuilder(3);
+    for (const at of [1, 2, 3, 4, 5]) act(builder, at);
+    expect(builder.snapshot(5).map((entry) => entry.origin?.at)).toEqual([5, 4, 3]);
+  });
 });
 
 function call(over: Partial<CallEvent> = {}): CallEvent {
