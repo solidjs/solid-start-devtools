@@ -618,6 +618,41 @@ test('lists runtime issues', async ({ page }) => {
   await expect(page.getByRole('tab', { name: 'Health', exact: true })).not.toContainText('2');
 });
 
+test('keeps the selected action listed after it leaves the last 30 seconds', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await page.locator('#increment-count').click();
+
+  await openTab(page, 'Timeline');
+  const rows = page
+    .locator('[data-solid-activity-row][data-kind="action"]')
+    .filter({ hasText: 'button#increment-count' });
+  await expect(rows).toHaveCount(1);
+  await rows.first().click();
+  await expect(rows.first()).toHaveAttribute('data-selected', '');
+
+  // The stores drop the first click once a newer action arrives past its 30 seconds.
+  await page.clock.runFor(31_000);
+  await page.locator('#increment-count').click();
+  await page.clock.runFor(500);
+
+  await expect(rows).toHaveCount(2);
+  await expect(page.locator('[data-solid-activity-row][data-selected]')).toHaveCount(1);
+  await expect(page.locator('[data-solid-activity-detail]')).toContainText('0 → 1');
+});
+
+test('clears a paused Activity view', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#increment-count').click();
+
+  await openTab(page, 'Timeline');
+  const actions = page.locator('[data-solid-activity-row][data-kind="action"]');
+  await expect(actions).toHaveCount(1);
+  await page.getByRole('button', { name: 'Pause live updates' }).click();
+  await page.getByTitle('Clear the timeline and the async history').click();
+  await expect(actions).toHaveCount(0);
+});
+
 test('shows what each action re-ran and why', async ({ page }) => {
   await page.goto('/');
   await page.locator('#increment-count').click();

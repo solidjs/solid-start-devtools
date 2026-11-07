@@ -23,7 +23,10 @@ import {
   GLYPHS,
   frozenSources,
   inWindow,
+  keepSelected,
+  selectedSources,
   type ActivitySources,
+  type SelectedSources,
   layoutLanes,
   viewRange,
   WINDOW_MS,
@@ -129,6 +132,8 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
   // What the list showed when it was paused.
   // Read by the sampler, outside any tracking scope.
   let frozenSrc: ActivitySources | undefined;
+  // What the selected row is built from, so it stays listed after the stores drop it.
+  let held: SelectedSources | undefined;
   // The clock reads these outside any tracking scope.
   let frozen = false;
   let pausedAt = 0;
@@ -156,7 +161,7 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
   function sample(taken?: ActivitySources): void {
     lastSample = performance.now();
     const frozenNow = frozenSrc;
-    const current = taken ?? currentSources();
+    const current = keepSelected(taken ?? currentSources(), held);
     setView({
       sources: frozenNow ? frozenSources(frozenNow, current) : current,
       now: frozen ? pausedAt : lastSample,
@@ -328,6 +333,13 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
   const buckets = createMemo(() => bucketRows(shown(), now()));
   const lanes = createMemo(() => layoutLanes(collected().rows, now()));
   const selection = createMemo(() => resolveSelection(collected().rows, selected()));
+  createEffect(
+    () => ({ row: selection()?.row, key: selected() }),
+    ({ row, key }) => {
+      if (row) held = selectedSources(row);
+      else if (key === undefined) held = undefined;
+    },
+  );
 
   // Each detail reads its own memo, which holds the same object while the list
   // redraws. A detail that read the selection itself would be told of every new
@@ -370,6 +382,9 @@ export default function ActivityViewer(props: ActivityViewerProps): JSX.Element 
 
   function clear(): void {
     setSelected(undefined);
+    held = undefined;
+    // A paused view shows what it took at the pause, so it is emptied too.
+    if (frozenSrc) frozenSrc = { entries: [], instances: {}, records: [], errors: [], live: [] };
     setTimeRange(undefined);
     props.onClear?.();
   }

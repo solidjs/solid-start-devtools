@@ -15,6 +15,7 @@ import {
   frozenSources,
   handlerLocation,
   inWindow,
+  keepSelected,
   layoutLanes,
   makeWindow,
   matchesFilter,
@@ -23,6 +24,7 @@ import {
   previewValue,
   resolveSelection,
   runBars,
+  selectedSources,
   shiftWindow,
   summarizeChain,
   ValueMemory,
@@ -447,6 +449,40 @@ describe('the last 30 seconds', () => {
       pinned: 's:fn#1',
     });
     expect(call.rows).toHaveLength(1);
+  });
+
+  it('keeps the selected row after the stores drop it', () => {
+    const old = entry(1, 'old', NOW - 60_000);
+    const wait = {
+      type: 'wait',
+      id: 7,
+      at: NOW - 60_000,
+      event: { blockers: ['user'], holdMs: 40, silent: false, long: false },
+    } as unknown as AsyncRecord;
+    const before = collect({ entries: [entry(3, 'new', NOW - 1000), old], records: [wait] });
+    const selectedAction = before.rows.find((row) => row.title === 'old')!;
+    const selectedWait = before.rows.find((row) => row.kind === 'async')!;
+
+    // The stores pruned both.
+    const current = {
+      entries: [entry(3, 'new', NOW - 1000)],
+      instances: {},
+      records: [],
+      errors: [],
+      live: [],
+    };
+    const action = keepSelected(current, selectedSources(selectedAction));
+    expect(collect({ ...action, range, pinned: 'a:1' }).rows.map((row) => row.title)).toEqual([
+      'new',
+      'old',
+    ]);
+    const record = keepSelected(current, selectedSources(selectedWait));
+    expect(collect({ ...record, range, pinned: 'w:7' }).rows).toHaveLength(2);
+
+    // Nothing changes while the stores still hold it, or with nothing selected.
+    const held = { ...current, entries: [entry(3, 'new', NOW - 1000), old] };
+    expect(keepSelected(held, selectedSources(selectedAction))).toBe(held);
+    expect(keepSelected(current, undefined)).toBe(current);
   });
 
   it('counts only the folded rows in the window', () => {

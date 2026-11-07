@@ -213,6 +213,47 @@ export function frozenSources(frozen: ActivitySources, current: ActivitySources)
   return { ...frozen, entries, instances };
 }
 
+/** The entries and the async record a selected row is built from. */
+export interface SelectedSources {
+  entries: readonly TimelineEntry[];
+  record: AsyncRecord | undefined;
+}
+
+/** The entries and the async record of a row, so the view can keep them once the stores drop them. */
+export function selectedSources(row: ActivityRow): SelectedSources {
+  const source = row.source;
+  if (source.type === 'action') return { entries: source.entries, record: undefined };
+  if (source.type === 'async') return { entries: [], record: source.record };
+  return { entries: [], record: undefined };
+}
+
+/**
+ * The sources with the selected row's entries and record added back where the
+ * stores dropped them for their age. A selection then stays listed until it is
+ * deselected, live or paused.
+ */
+export function keepSelected(
+  current: ActivitySources,
+  held: SelectedSources | undefined,
+): ActivitySources {
+  if (!held) return current;
+  let entries = current.entries;
+  const ids = new Set<number>();
+  for (const entry of current.entries) ids.add(entry.id);
+  // The stores drop the oldest first, so a dropped entry goes at the end of the newest-first list.
+  for (const entry of held.entries) {
+    if (ids.has(entry.id)) continue;
+    if (entries === current.entries) entries = [...current.entries];
+    (entries as TimelineEntry[]).push(entry);
+  }
+  let records = current.records;
+  if (held.record && !current.records.includes(held.record)) {
+    records = [...current.records, held.record];
+  }
+  if (entries === current.entries && records === current.records) return current;
+  return { ...current, entries, records };
+}
+
 export interface CollectInput {
   entries: readonly TimelineEntry[];
   instances: Record<string, ServerFunctionInstance | undefined>;
