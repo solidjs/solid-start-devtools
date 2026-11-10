@@ -1,3 +1,5 @@
+import { untrack } from 'solid-js';
+
 /** Raw owner or signal from the runtime. Only the fields the tree needs are read. */
 export type RawNode = Record<string, any>;
 
@@ -162,6 +164,38 @@ function propNames(owner: RawNode): string[] | undefined {
   }
 }
 
+export interface PropValue {
+  name: string;
+  value: unknown;
+}
+
+/**
+ * Reads the props of a component. They are getters, so a read can run app code
+ * and throw. Each one is read on its own, outside any tracking scope, and a
+ * getter that throws shows its error as the value.
+ */
+export function readPropValues(owner: RawNode): PropValue[] {
+  const props = owner._component?.props;
+  if (!props || typeof props !== 'object') return [];
+  let names: string[];
+  try {
+    names = Object.keys(props);
+  } catch {
+    return [];
+  }
+  const out: PropValue[] = [];
+  for (const name of names) {
+    let value: unknown;
+    try {
+      value = untrack(() => props[name]);
+    } catch (error) {
+      value = error;
+    }
+    out.push({ name, value });
+  }
+  return out;
+}
+
 /** The runtime clock of a node's last write. Zero for owners that hold no value. */
 function timeOf(node: RawNode): number {
   return typeof node._time === 'number' ? node._time : 0;
@@ -188,6 +222,10 @@ export interface BuildOptions {
   componentsOnly: boolean;
   /** Keep owners the runtime already disposed. */
   includeDisposed?: boolean;
+  /** Walk through the components Solid ships, so their children join the parent. */
+  hideBuiltins?: boolean;
+  /** True for a component that comes from solid-js or @solidjs/web. */
+  isBuiltin?(owner: RawNode): boolean;
 }
 
 /**
@@ -264,6 +302,14 @@ export function buildOwnershipTree(roots: RawNode[], options: BuildOptions): Own
     // Runtime wiring is nobody's owner. It never becomes a row or a folded
     // scope, in either mode. Whatever it owns belongs to the owner above it.
     if (isPlumbing(owner)) {
+      if (host) collectSignals(owner, host);
+      for (const child of options.children(owner)) walk(child, host, depth, false);
+      return;
+    }
+
+    // A built-in such as For or Show is nobody's concern. Its children join the
+    // component above it.
+    if (options.hideBuiltins && isComponent(owner) && options.isBuiltin?.(owner)) {
       if (host) collectSignals(owner, host);
       for (const child of options.children(owner)) walk(child, host, depth, false);
       return;

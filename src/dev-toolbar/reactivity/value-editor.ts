@@ -1,4 +1,6 @@
-import { createRoot, createSignal, DEV, flush, getOwner, runWithOwner } from 'solid-js';
+import { createRoot, createSignal, DEV, flush, getOwner, OBSERVE, runWithOwner } from 'solid-js';
+import { excludeOwner } from '../ownership/registry.js';
+import { excludeReactiveOwner } from './registry.js';
 
 /**
  * Whether a value is an array or an object made by `{}` or
@@ -219,6 +221,8 @@ function resolveWrite(
 class ReactiveWriter {
   private setter?: (value: unknown) => unknown;
   private bridgeNode?: Record<string, unknown>;
+  /** The node the bridge forwards to now. */
+  private forwarded?: Record<string, any>;
 
   private ensureBridge(): void {
     if (this.setter && this.bridgeNode) return;
@@ -226,6 +230,12 @@ class ReactiveWriter {
       const [_, set] = createSignal(0);
       this.setter = set as (value: unknown) => unknown;
       const owner = getOwner();
+      // The bridge is the toolbar's, so the graph, the tree and the runtime's
+      // records leave it out. Listed as app code, the graph could hand it back
+      // as the node to edit.
+      excludeReactiveOwner(owner);
+      excludeOwner(owner);
+      if (owner) OBSERVE?.exclude(owner);
       const signals = DEV?.getSignals
         ? (DEV.getSignals(owner as never) as Record<string, unknown>[])
         : [];
@@ -238,6 +248,14 @@ class ReactiveWriter {
     // would leave the backing data changed with no subscriber told.
     this.ensureBridge();
     if (!this.setter || !this.bridgeNode) return false;
+
+    // A panel that still holds the bridge means the node it forwards to.
+    // Forwarding the bridge to itself would recurse in every getter.
+    if (target === this.bridgeNode) {
+      if (!this.forwarded) return false;
+      target = this.forwarded;
+    }
+    this.forwarded = target;
 
     if ('_host' in target && target._host) {
       const key = target._key;

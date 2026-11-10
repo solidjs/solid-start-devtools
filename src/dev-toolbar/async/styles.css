@@ -285,7 +285,10 @@
 
   gap: 0.625rem;
 
-  width: 24rem;
+  position: relative;
+
+  /* Keeps the list usable when the window shrinks below a saved width. */
+  max-width: calc(100% - 240px);
   flex-shrink: 0;
   min-height: 0;
 

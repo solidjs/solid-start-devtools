@@ -60,8 +60,11 @@ export interface TimelineEntry {
   calls: TimelineCall[];
 }
 
-/** Most entries the panel keeps. The oldest go first. */
-export const MAX_ENTRIES = 100;
+/** How far back the timeline and the Activity view look. */
+export const WINDOW_MS = 30_000;
+/** A safety cap that only applies in a runaway, such as a loop that makes thousands of actions a second. */
+export const MAX_ENTRIES = 5000;
+
 /** Most re-runs one entry keeps. */
 export const MAX_RUNS = 300;
 
@@ -114,6 +117,23 @@ export function isUnnamedUpdate(entry: TimelineEntry): boolean {
   return !entry.origin && entry.writes.every((write) => DEFAULT_NAMES.has(write.name));
 }
 
+/**
+ * An entry that wrote nothing, re-ran nothing and made no call, hold or
+ * navigation. A click inside the toolbar ends up here: the runtime counts its
+ * flush, but the toolbar's own nodes send no records. Lists leave it out, as
+ * they do an interaction that changed nothing.
+ */
+export function isIdleEntry(entry: TimelineEntry): boolean {
+  return (
+    !entry.writes.length &&
+    !entry.runs.length &&
+    !entry.droppedRuns &&
+    !entry.calls.length &&
+    !entry.holds.length &&
+    !entry.navigations.length
+  );
+}
+
 function externalLabel(writes: ChangeRecord[]): string {
   const origin = writes.find((write) => write.origin)?.origin;
   const source = origin && origin.kind !== 'external' ? formatOrigin(origin) : 'update';
@@ -138,7 +158,10 @@ export class TimelineBuilder {
    */
   private idle = new WeakMap<ChangeOrigin, InteractionEvent>();
 
-  constructor(private readonly max = MAX_ENTRIES) {}
+  constructor(
+    private readonly max = MAX_ENTRIES,
+    private readonly windowMs = WINDOW_MS,
+  ) {}
 
   private create(origin: ChangeOrigin | undefined, at: number): TimelineEntry {
     const entry: TimelineEntry = {
@@ -157,12 +180,26 @@ export class TimelineBuilder {
       calls: [],
     };
     this.entries.unshift(entry);
-    for (const dropped of this.entries.splice(this.max)) {
+    if (origin) this.byOrigin.set(origin, entry);
+    this.prune(entry.at);
+    return entry;
+  }
+
+  /**
+   * Drops the entries that began before the window ending at `now`, and the
+   * oldest ones past the safety cap. Returns whether any went. The list is
+   * newest first, so the oldest are at the end.
+   */
+  private prune(now: number): boolean {
+    const cutoff = now - this.windowMs;
+    let keep = this.entries.length;
+    while (keep > 0 && (keep > this.max || this.entries[keep - 1]!.at < cutoff)) keep--;
+    if (keep === this.entries.length) return false;
+    for (const dropped of this.entries.splice(keep)) {
       if (dropped.origin) this.byOrigin.delete(dropped.origin);
       if (dropped === this.external) this.external = undefined;
     }
-    if (origin) this.byOrigin.set(origin, entry);
-    return entry;
+    return true;
   }
 
   private entryFor(origin: ChangeOrigin | undefined, at: number): TimelineEntry {
@@ -259,8 +296,9 @@ export class TimelineBuilder {
    * The entries for the panel. An entry that changed since the last call is a
    * new object, so the panel redraws only what moved.
    */
-  snapshot(): TimelineEntry[] {
-    if (!this.changed.size) return this.entries;
+  snapshot(now = performance.now()): TimelineEntry[] {
+    const pruned = this.prune(now);
+    if (!this.changed.size) return pruned ? this.entries.slice() : this.entries;
     this.entries = this.entries.map((entry) => {
       if (!this.changed.has(entry)) return entry;
       const copy = {
@@ -345,8 +383,9 @@ export function startTimeline(builder: TimelineBuilder, onChange: () => void): (
       changed();
     }),
   ];
-  // The console log stays off: the panel is where the re-runs are read.
-  const release = attribution.enable({ log: false, values: 'full' });
+  // The console log stays off: the panel is where the re-runs are read. Stacks
+  // are on so each write names the line of the handler that made it.
+  const release = attribution.enable({ log: false, values: 'full', stacks: true });
   return () => {
     release();
     for (const off of offs) off();

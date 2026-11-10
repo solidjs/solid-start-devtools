@@ -8,7 +8,7 @@ export interface CodeViewProps {
   fileName: string;
   content: string;
   line: number;
-  /** Column of the error, so the marker can point at one word instead of the line. */
+  /** Column of the error, so the `err` marker wraps one expression instead of the line. */
   column?: number;
 }
 

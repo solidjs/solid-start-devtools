@@ -1,0 +1,701 @@
+/* The Activity view: lanes on top, the list beside the detail pane. Selection is a fill, never a side rule. */
+
+[data-solid-activity] {
+  display: flex;
+  flex-direction: column;
+
+  height: 100%;
+  min-height: 0;
+
+  color: var(--start-dt-text);
+  font:
+    13px/1.45 system-ui,
+    -apple-system,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* :where keeps the reset from outweighing the buttons' own rules */
+:where([data-solid-activity]) button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* ---------- lanes ---------- */
+
+[data-solid-activity-scrub] {
+  position: relative;
+  flex: none;
+  padding: 7px 14px 5px 84px;
+  border-bottom: 1px solid var(--start-dt-line);
+}
+
+[data-solid-activity-lane] {
+  position: relative;
+  height: 13px;
+  margin-bottom: 3px;
+}
+
+[data-solid-activity-lane] label {
+  position: absolute;
+  left: -70px;
+  width: 62px;
+  text-align: right;
+  font-size: 9.5px;
+  color: var(--start-dt-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 13px;
+}
+
+[data-solid-activity-tick] {
+  position: absolute;
+  top: 3px;
+  height: 7px;
+  min-width: 2px;
+  border-radius: 2px;
+}
+
+[data-solid-activity-lane='actions'] [data-solid-activity-tick] {
+  width: 2px;
+  background: var(--start-dt-solid);
+  opacity: 0.5;
+}
+
+[data-solid-activity-lane='actions'] [data-solid-activity-tick][data-big] {
+  width: 3px;
+  opacity: 1;
+  top: 0;
+  height: 13px;
+}
+
+[data-solid-activity-lane='server'] [data-solid-activity-tick] {
+  background: var(--start-dt-violet);
+}
+
+[data-solid-activity-lane='async'] [data-solid-activity-tick] {
+  background: var(--start-dt-amber-soft);
+  border: 1px solid var(--start-dt-amber);
+}
+
+[data-solid-activity-tick][data-selected] {
+  opacity: 1;
+  box-shadow: 0 0 0 1px var(--start-dt-text);
+}
+
+/* the strip takes the pointer: a drag on it picks a time range */
+[data-solid-activity-track-area] {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 84px;
+  right: 14px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+[data-solid-activity-window] {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border: 1px solid var(--start-dt-line-2);
+  background: oklch(1 0 0 / 0.03);
+  border-radius: 5px;
+  cursor: grab;
+}
+
+[data-solid-activity-window]:focus-visible {
+  outline: 2px solid var(--start-dt-solid);
+  outline-offset: 1px;
+}
+
+[data-solid-activity-window-edge] {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+[data-solid-activity-window-edge='from'] {
+  left: -4px;
+}
+
+[data-solid-activity-window-edge='to'] {
+  right: -4px;
+}
+
+/* ---------- split ---------- */
+
+[data-solid-activity-split] {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+[data-solid-activity-list] {
+  flex: 1;
+  min-width: 240px;
+  overflow: auto;
+  padding: 6px;
+}
+
+[data-solid-activity-detail] {
+  position: relative;
+  flex: none;
+  /* Keeps the list usable when the window shrinks below a saved width. */
+  max-width: calc(100% - 240px);
+  overflow: auto;
+  padding: 14px 18px;
+  border-left: 1px solid var(--start-dt-line);
+}
+
+/* ---------- list ---------- */
+
+[data-solid-activity-filters] {
+  display: flex;
+  gap: 6px;
+  padding: 4px 4px 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+[data-solid-activity-chip] {
+  font-size: 11.5px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  border: 1px solid var(--start-dt-line-2);
+  color: var(--start-dt-text-muted);
+  white-space: nowrap;
+}
+
+[data-solid-activity-chip]:hover {
+  color: var(--start-dt-text);
+}
+
+[data-solid-activity-chip][data-on] {
+  background: var(--start-dt-raise-2);
+  color: var(--start-dt-text);
+  border-color: transparent;
+}
+
+[data-solid-activity-chip][data-ghost] {
+  margin-left: auto;
+  color: var(--start-dt-faint);
+  border-style: dashed;
+}
+
+[data-solid-activity-chip][data-ghost][data-on] {
+  color: var(--start-dt-text);
+}
+
+[data-solid-activity-chip][data-ghost] ~ [data-solid-activity-chip] {
+  margin-left: 0;
+}
+
+[data-solid-activity-chip][data-clear] {
+  color: var(--start-dt-faint);
+}
+
+[data-solid-activity-chip]:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+[data-solid-activity] button:focus-visible {
+  outline: 2px solid var(--start-dt-solid);
+  outline-offset: -2px;
+}
+
+[data-solid-activity-row] {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  text-align: left;
+}
+
+[data-solid-activity-row]:hover {
+  background: oklch(1 0 0 / 0.04);
+}
+
+[data-solid-activity-row][data-selected] {
+  background: var(--start-dt-raise-2);
+}
+
+[data-solid-activity-what] {
+  min-width: 0;
+}
+
+[data-solid-activity-what] b {
+  font-weight: 600;
+}
+
+[data-solid-activity-what] > div {
+  color: var(--start-dt-faint);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* a folded run reads quieter than a single action */
+[data-solid-activity-row][data-repeat] [data-solid-activity-glyph] {
+  opacity: 0.55;
+}
+
+[data-solid-activity-row][data-repeat] b {
+  color: var(--start-dt-text-muted);
+}
+
+[data-solid-activity-count] {
+  font: 600 10.5px var(--start-dt-mono);
+  padding: 0 5px;
+  border-radius: 99px;
+  line-height: 16px;
+  color: var(--start-dt-faint);
+}
+
+[data-solid-activity-t] {
+  font: 11px var(--start-dt-mono);
+  color: var(--start-dt-faint);
+  text-align: right;
+}
+
+[data-solid-activity-glyph] {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  font: 700 10px var(--start-dt-mono);
+  flex: none;
+}
+
+[data-solid-activity-glyph='act'] {
+  background: var(--start-dt-solid-soft);
+  color: var(--start-dt-solid);
+}
+
+[data-solid-activity-glyph='srv'] {
+  background: var(--start-dt-violet-soft);
+  color: var(--start-dt-violet);
+}
+
+[data-solid-activity-glyph='wait'] {
+  background: var(--start-dt-amber-soft);
+  color: var(--start-dt-amber);
+}
+
+[data-solid-activity-glyph='err'] {
+  background: var(--start-dt-red-soft);
+  color: var(--start-dt-red);
+}
+
+[data-solid-activity-group] {
+  color: var(--start-dt-faint);
+  font-size: 10.5px;
+  padding: 8px 10px 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+[data-solid-activity-group]::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--start-dt-line);
+}
+
+[data-solid-activity-empty] {
+  padding: 16px 10px;
+  color: var(--start-dt-faint);
+  font-size: 12px;
+}
+
+/* ---------- detail ---------- */
+
+[data-solid-activity-detail-body] h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+[data-solid-activity-title] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-solid-activity-sub] {
+  color: var(--start-dt-faint);
+  margin: 2px 0 14px;
+  font-size: 12px;
+}
+
+[data-solid-activity-sect] {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--start-dt-faint);
+  margin: 14px 0 8px;
+  display: flex;
+  justify-content: space-between;
+}
+
+[data-solid-activity-chain] {
+  display: flex;
+  align-items: stretch;
+  margin-bottom: 4px;
+}
+
+[data-solid-activity-node] {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--start-dt-line-2);
+  border-radius: 8px;
+  background: var(--start-dt-raise);
+}
+
+[data-solid-activity-node] small {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--start-dt-faint);
+}
+
+[data-solid-activity-node] code {
+  display: block;
+  font: 12px var(--start-dt-mono);
+  overflow-wrap: anywhere;
+}
+
+[data-solid-activity-node] code[data-solid-activity-none] {
+  color: var(--start-dt-faint);
+}
+
+[data-solid-activity-delta] {
+  font: 11px var(--start-dt-mono);
+  color: var(--start-dt-text-muted);
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+[data-solid-activity-del] {
+  color: var(--start-dt-red);
+}
+
+[data-solid-activity-ins] {
+  color: var(--start-dt-green);
+}
+
+[data-solid-activity-arrow] {
+  width: 24px;
+  display: grid;
+  place-items: center;
+  color: var(--start-dt-faint);
+  flex: none;
+}
+
+[data-solid-activity-wf] {
+  display: grid;
+  grid-template-columns: minmax(110px, 160px) 1fr 50px;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 3px 0;
+  font: 12px var(--start-dt-mono);
+  text-align: left;
+}
+
+[data-solid-activity-wf] > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-solid-activity-wf][data-kind='server'] > span:first-child {
+  color: var(--start-dt-violet);
+}
+
+[data-solid-activity-wf][role='button'] {
+  cursor: pointer;
+}
+
+[data-solid-activity-track] {
+  height: 8px;
+  background: oklch(1 0 0 / 0.04);
+  border-radius: 4px;
+  position: relative;
+}
+
+[data-solid-activity-track] i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  background: var(--start-dt-violet);
+}
+
+[data-solid-activity-wf][data-kind='effect'] i {
+  background: var(--start-dt-green);
+}
+
+[data-solid-activity-wf][data-kind='server'] i {
+  background: oklch(0.72 0.15 300 / 0.5);
+}
+
+[data-solid-activity-ms] {
+  color: var(--start-dt-faint);
+  text-align: right;
+}
+
+[data-solid-activity-wf]:focus-visible {
+  outline: 2px solid var(--start-dt-solid);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* what caused a re-run, under its row */
+[data-solid-activity-why] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 0 6px;
+  padding-left: 12px;
+  font: 11px var(--start-dt-mono);
+  color: var(--start-dt-text-muted);
+}
+
+[data-solid-activity-causes] {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+[data-solid-activity-causes] ul {
+  list-style: none;
+  margin: 0;
+  padding-left: 14px;
+}
+
+[data-solid-activity-note] {
+  color: var(--start-dt-faint);
+  font-size: 11px;
+  padding-top: 4px;
+}
+
+[data-solid-activity-concern] {
+  font-size: 12px;
+  color: var(--start-dt-amber);
+}
+
+[data-solid-activity-concern][data-plain] {
+  color: var(--start-dt-text);
+  font-family: var(--start-dt-mono);
+  overflow-wrap: anywhere;
+}
+
+[data-solid-activity-link] {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 8px 4px 4px;
+  border-radius: 7px;
+  font-weight: 600;
+}
+
+[data-solid-activity-link]:hover {
+  background: oklch(1 0 0 / 0.05);
+}
+
+[data-solid-activity-btnrow] {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 14px;
+}
+
+[data-solid-activity-btn] {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid var(--start-dt-line-2);
+  color: var(--start-dt-text-muted);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex: none;
+}
+
+[data-solid-activity-btn]:hover {
+  color: var(--start-dt-text);
+  background: oklch(1 0 0 / 0.05);
+}
+
+[data-solid-activity-btn][data-primary] {
+  background: var(--start-dt-solid);
+  color: oklch(0.16 0.02 265);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+[data-solid-activity-btn][data-primary]:hover {
+  background: var(--start-dt-solid);
+  filter: brightness(1.08);
+}
+
+[data-solid-activity-btn][data-solid-copy-report='failed'] {
+  color: var(--start-dt-red);
+}
+
+[data-solid-activity-btn]:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-solid-activity-row],
+  [data-solid-activity-chip],
+  [data-solid-activity-btn] {
+    transition:
+      background-color 150ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      color 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}
+
+/* outcome of an action, next to its title */
+[data-solid-activity-pill] {
+  font: 600 10.5px var(--start-dt-mono);
+  line-height: 16px;
+  padding: 0 7px;
+  border-radius: 99px;
+  flex: none;
+  background: var(--start-dt-raise-2);
+  color: var(--start-dt-text-muted);
+}
+
+[data-solid-activity-pill='held'] {
+  background: var(--start-dt-amber-soft);
+  color: var(--start-dt-amber);
+}
+
+[data-solid-activity-pill='committed'] {
+  background: var(--start-dt-green-soft);
+  color: var(--start-dt-green);
+}
+
+[data-solid-activity-kv] [data-solid-kv-key] {
+  flex-basis: 6rem;
+}
+
+[data-solid-activity-hold] {
+  font: 12px var(--start-dt-mono);
+  color: var(--start-dt-text-muted);
+  padding: 2px 0;
+}
+
+/* the time axis: gridlines every 10s through the lanes, labels under them */
+[data-solid-activity-grid] {
+  position: absolute;
+  top: 0;
+  bottom: 20px;
+  left: 84px;
+  right: 14px;
+  pointer-events: none;
+}
+
+[data-solid-activity-gridline] {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--start-dt-line);
+}
+
+[data-solid-activity-nowline] {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 1px;
+  background: var(--start-dt-line-2);
+}
+
+[data-solid-activity-axis] {
+  position: relative;
+  height: 13px;
+  margin-top: 2px;
+}
+
+[data-solid-activity-axis-label] {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font: 9.5px/13px var(--start-dt-mono);
+  color: var(--start-dt-faint);
+  white-space: nowrap;
+}
+
+[data-solid-activity-axis-label]:last-child {
+  transform: translateX(-100%);
+}
+
+[data-solid-activity-axis-label]:first-child {
+  transform: none;
+}
+
+[data-solid-activity-pause] {
+  margin-left: auto;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 7px;
+  color: var(--start-dt-text-muted);
+}
+
+[data-solid-activity-pause]:hover {
+  background: oklch(1 0 0 / 0.06);
+  color: var(--start-dt-text);
+}
+
+[data-solid-activity-pause][aria-pressed='true'] {
+  color: var(--start-dt-solid);
+}
+
+[data-solid-activity-chip][data-ghost] ~ [data-solid-activity-pause] {
+  margin-left: 0;
+}
+
+[data-solid-activity-lane='actions'] [data-solid-activity-tick][data-run] {
+  border-radius: 3px;
+}

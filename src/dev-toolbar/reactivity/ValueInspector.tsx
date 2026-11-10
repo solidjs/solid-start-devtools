@@ -1,5 +1,5 @@
 import type { JSX } from '@solidjs/web';
-import { createMemo, createSignal, For, Show } from 'solid-js';
+import { createMemo, For, Show } from 'solid-js';
 import { Badge } from '../../ui/Badge.js';
 import {
   TreeBranch,

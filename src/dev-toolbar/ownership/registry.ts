@@ -1,5 +1,6 @@
 import { DEV } from 'solid-js';
 import { listenToDevHooks } from '../dev-hooks.js';
+import { isSolidBuiltin } from './builtins.js';
 import { buildOwnershipTree, EMPTY_TREE, type OwnershipTree, type RawNode } from './tree.js';
 
 let nextId = 1;
@@ -157,6 +158,8 @@ function rootOf(owner: RawNode): RawNode {
 
 export interface SnapshotOptions {
   componentsOnly?: boolean;
+  /** Fold the components Solid ships into their parents. */
+  hideBuiltins?: boolean;
   includeDisposed?: boolean;
 }
 
@@ -189,5 +192,7 @@ export function snapshotOwnershipTree(options?: SnapshotOptions): OwnershipTree 
     isIncluded,
     componentsOnly: options?.componentsOnly ?? true,
     includeDisposed: options?.includeDisposed,
+    hideBuiltins: options?.hideBuiltins ?? options?.componentsOnly ?? true,
+    isBuiltin: isSolidBuiltin,
   });
 }
