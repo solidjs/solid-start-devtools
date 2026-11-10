@@ -13,6 +13,7 @@ import { reactiveReport } from '../report/reactive-report.js';
 import { formatValue, typeName } from './format.js';
 import {
   ARROW_SIZE,
+  edgeKey,
   edgePath,
   layoutGraph,
   NODE_HEIGHT,
@@ -640,7 +641,11 @@ export default function ReactivityViewer(props: ReactivityViewerProps): JSX.Elem
                                   {(to) => (
                                     <path
                                       data-solid-reactivity-edge={role()}
-                                      d={edgePath(from(), to())}
+                                      d={edgePath(
+                                        from(),
+                                        to(),
+                                        layout().routes.get(edgeKey(edge())),
+                                      )}
                                       marker-end={
                                         role() === 'plain' || role() === 'muted'
                                           ? 'url(#solid-reactivity-arrow)'
