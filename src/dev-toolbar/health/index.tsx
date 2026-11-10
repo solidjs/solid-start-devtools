@@ -6,6 +6,7 @@ import { useResizableDetail } from '../../ui/use-resizable-detail.js';
 import type { ErrorRecord } from '../error-record.js';
 import { IssueDetail, matchesIssue, TONES } from '../issues/index.js';
 import { isIssuesAvailable, issueText, type IssueEntry } from '../issues/tracker.js';
+import { serverErrorPlace } from '../dev-server.js';
 import { describeError } from './describe-error.js';
 import { HealthRow } from './HealthRow.js';
 import { leadingPane } from './leading-pane.js';
@@ -214,7 +215,11 @@ export default function HealthViewer(props: HealthViewerProps): JSX.Element {
                     data-solid-health-error-row
                     tone="error"
                     title={info().name}
-                    subtitle={info().message}
+                    subtitle={
+                      item.record.server
+                        ? `${serverErrorPlace(item.record.server)}: ${info().message}`
+                        : info().message
+                    }
                     time={errorAge(item.record)}
                     selected={isSelected()}
                     onClick={() => setSelected({ kind: 'error', index: item.index })}

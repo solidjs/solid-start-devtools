@@ -1,5 +1,11 @@
+/// <reference types="vite/client" />
 import { Loading, render } from '@solidjs/web';
-import { DevToolbar, mountDevToolbar, pushServerFunctionCall } from '@solidjs/start-devtools';
+import {
+  connectDevServer,
+  DevToolbar,
+  mountDevToolbar,
+  pushServerFunctionCall,
+} from '@solidjs/start-devtools';
 import { serializeString } from '@solidjs/web/server-functions/client';
 import { createEffect, createMemo, createSignal, OBSERVE, Show } from 'solid-js';
 
@@ -187,6 +193,11 @@ function App() {
       </Show>
     </main>
   );
+}
+
+// Stands in for @solidjs/vite-plugin, which connects from the client entry it generates.
+if (new URLSearchParams(location.search).has('dev-server') && import.meta.hot) {
+  connectDevServer(import.meta.hot);
 }
 
 if (new URLSearchParams(location.search).has('mount')) {

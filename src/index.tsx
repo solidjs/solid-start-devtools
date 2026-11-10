@@ -7,6 +7,8 @@ import {
 } from './dev-toolbar/functions/tracker.js';
 import { DevToolbar, type DevToolbarProps } from './dev-toolbar/index.js';
 
+export { connectDevServer } from './dev-toolbar/dev-server.js';
+
 let dispose: (() => void) | undefined;
 let frame: number | undefined;
 
