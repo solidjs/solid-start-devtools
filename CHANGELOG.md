@@ -1,5 +1,67 @@
 # @solidjs/start-devtools
 
+## 1.0.0-next.9
+
+### Minor Changes
+
+- d99ff2c: Add an Async panel that shows what the app is loading now, and how its async loads, waits and fallbacks went.
+
+  - Loads that a newer load replaced, waits with no pending state on screen, fallbacks that flashed, and loads that ran one after another are flagged.
+  - A record shows the action that started it and links to the reactivity graph and the ownership tree.
+  - The copy button puts a report of the record on the clipboard for an agent.
+
+- a7dedf8: Add `connectDevServer`, which lets `@solidjs/vite-plugin` send the toolbar what only the dev server knows, and `@solidjs/start-devtools/protocol`, the messages and endpoints both sides use.
+
+  - Errors the server runtime reports during a render, a server function or a request show in the Health view.
+  - Open in editor sends one request to the plugin's endpoint, which resolves the path against the Vite root.
+  - The solid-js version in the header comes from the dev server when the page cannot import the package file.
+
+- dba6dfe: - The dock has three views in its header: Health, Activity and Structure. The header shows the `solid-js` version the app runs, in place of the toolbar's title and version.
+  - Health lists thrown errors and runtime issues together, with search and severity chips. An error shows the function it was thrown in, when it was caught, the action it was caught during with a link to it, its stack frames beside the source, and "Open in editor".
+  - Activity merges actions, server-function calls, async loads and waits, and errors into one stream over the last 30 seconds, with a live lanes strip on a time axis, filter chips, time groups and a pause button. Repeated actions fold into one row. An action shows what it wrote, what re-ran and which effects ran, then waterfalls of its re-runs and server calls.
+  - Structure shows the ownership tree or the reactivity graph. Tree rows show signal and memo counts and how recently and how often their computations update. "Hide Solid internals" folds Solid's own components away. The detail lists props, signals and memos by kind, with a signal's previous value.
+  - ⌘K (Ctrl+K) opens a search across components, signals, memos, actions and server functions while the dock is open.
+  - The timeline and the async history keep everything from the last 30 seconds instead of a fixed number of entries, so a loop such as an animation frame no longer pushes other actions out. A fast run of one action draws as one bar.
+  - Every list and detail split is resizable.
+- 2b8a936: Add an Issues panel that lists the issues the Solid runtime reports, such as a signal read outside a tracking scope. Each one is an error, a warning or info.
+
+  - Repeated findings are grouped with a count, and the tab shows the total.
+  - A finding links to its owner in the ownership tree, its node in the reactivity graph, and its section of the repair guide.
+  - The copy button puts a report of the finding on the clipboard for an agent.
+
+- 52dc743: Add live state and store editing to the dev toolbar.
+
+  Signals and stores can now be inspected and edited live on-the-fly directly from the devtools:
+
+  - In the Reactivity Graph detail pane, primitive values and nested properties of selected signals and store slots can be edited inline.
+  - In the Ownership Tree detail pane, component signals feature inline editing with immediate updates to dependent memos, effects, and DOM elements.
+  - Boolean values support 1-click toggling, while strings, numbers, null, undefined, and JSON objects/arrays are parsed and written through Solid's internal reactivity scheduler.
+  - Values inside a `Map`, a `Set`, a typed array or a class instance are shown but not editable. An edit the app does not take is marked in the panel.
+
+- ed9f773: Make the detail panes in the Ownership and Reactivity panels resizable. Drag the left edge of a pane, or focus it and press the left and right arrow keys. Each pane keeps its own width across reloads, and a double-click on the edge resets it.
+- c6402b7: The dock header has a button that copies one report of the whole session for an agent: the newest errors, the issues, the recent timeline actions, the flagged async records and the failed server calls.
+- 588365e: Add a Timeline panel that lists what each user action re-ran, and why.
+
+  - Each click, key press or outside update is a row with its writes, re-runs and timing.
+  - A re-run shows the changes that caused it, down to the write that started them.
+  - The server-function calls an action made are listed under it, and open in the server-function panel.
+  - The copy button puts a report of the action on the clipboard for an agent.
+
+### Patch Changes
+
+- 368b4c9: The toolbar keeps the 200 newest errors, so an error thrown in a loop no longer grows the list without end.
+- 62df134: The reactivity graph lays out each group of connected nodes in a band of its own, so unrelated chains no longer share columns.
+
+  - Nodes with no edges share a grid under the bands instead of one tall column.
+  - An edge that skips columns runs in a lane of its own instead of through other nodes.
+  - A signal sits in the column right before the node that reads it.
+  - A band keeps its arrangement while its nodes and edges stay the same. A band whose structure changed is arranged again, so its edges cross as little as possible.
+
+- 212dad4: Errors thrown by browser extensions' scripts in the page are no longer listed as the app's errors.
+- fd65515: Show the body of server function calls that send files.
+
+  With `enableRichArguments()` in `@solidjs/web` 2.0.0-rc.20, a call whose arguments hold a `File` or `Blob` sends multipart form data marked `X-Server-Function-Format: 0`. The panel read that body as a seroval stream and showed no body. It now shows the arguments in the seroval tree and the files in a form data table. Reports copied for an agent list both.
+
 ## 1.0.0-next.8
 
 ### Minor Changes
