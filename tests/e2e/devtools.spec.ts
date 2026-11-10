@@ -359,20 +359,18 @@ test('maps the reactivity graph', async ({ page }) => {
   await expect(nodes.filter({ hasText: /^doubled/ }).first()).toBeVisible();
   await expect(nodes.filter({ hasText: /^report-doubled/ }).first()).toBeVisible();
 
-  // Effects that subscribe to nothing sit in their own column before the signals.
-  const columns = await nodes.evaluateAll((elements) =>
-    elements.map((element) => ({
-      x: Math.round(element.getBoundingClientRect().x),
-      kind: (element as HTMLElement).dataset.kind,
-    })),
-  );
-  const leftmost = Math.min(...columns.map((entry) => entry.x));
-  expect(
-    columns
-      .filter((entry) => entry.x === leftmost)
-      .every((entry) => entry.kind?.includes('effect')),
-  ).toBe(true);
-  expect(columns.some((entry) => entry.kind === 'signal' && entry.x > leftmost)).toBe(true);
+  // A chain runs left to right, one column per step.
+  const countBox = (await count.boundingBox())!;
+  const doubledBox = (await nodes
+    .filter({ hasText: /^doubled/ })
+    .first()
+    .boundingBox())!;
+  const reportBox = (await nodes
+    .filter({ hasText: /^report-doubled/ })
+    .first()
+    .boundingBox())!;
+  expect(countBox.x).toBeLessThan(doubledBox.x);
+  expect(Math.round(doubledBox.x - countBox.x)).toBe(Math.round(reportBox.x - doubledBox.x));
 
   // Hovering a node explains it without selecting it.
   await count.hover();
